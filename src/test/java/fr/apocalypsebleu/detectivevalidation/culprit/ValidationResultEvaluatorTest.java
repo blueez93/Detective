@@ -37,6 +37,21 @@ class ValidationResultEvaluatorTest {
         assertFalse(result.passed());
         assertEquals(2, result.expectedCulpritRank());
         assertEquals("alpha", result.detectedTopSuspect());
+        assertFalse(result.top1Match());
+        assertTrue(result.top3Match());
+    }
+
+    @Test
+    void canAcceptTopThreeForAnExplicitIndirectStackExperiment() {
+        ValidationResultEvaluator.Result result = ValidationResultEvaluator.evaluate(
+                new ValidationResultEvaluator.Expected(CULPRIT, 300L, true, 3),
+                detected(List.of(
+                        suspect("caller_mod", 100.0),
+                        suspect(CULPRIT, 100.0))));
+
+        assertTrue(result.passed());
+        assertFalse(result.top1Match());
+        assertTrue(result.top3Match());
     }
 
     @Test

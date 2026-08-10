@@ -9,12 +9,14 @@ public record FreezeIncident(
         double thresholdMs,
         FrameSample frame,
         int watchdogSamples,
+        AttributionEvidence attributionEvidence,
         List<SuspectAnalyzer.Suspect> suspects,
         List<SuspectAnalyzer.HotClass> hotClasses,
         List<FrameSample> blackBox
 ) {
     public FreezeIncident {
         frame = Objects.requireNonNull(frame, "frame");
+        attributionEvidence = Objects.requireNonNull(attributionEvidence, "attributionEvidence");
         suspects = List.copyOf(Objects.requireNonNull(suspects, "suspects"));
         hotClasses = List.copyOf(Objects.requireNonNull(hotClasses, "hotClasses"));
         blackBox = List.copyOf(Objects.requireNonNull(blackBox, "blackBox"));

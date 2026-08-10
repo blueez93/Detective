@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
@@ -25,13 +26,16 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.LongAdder;
 
 public final class ValidationHarness {
     private static final Gson GSON = new Gson();
     private static final long POSITIVE_TIMEOUT_MS = 8_000L;
     private static final long NEGATIVE_OBSERVATION_MS = 3_000L;
-    private static final int MAX_SCHEDULED_ACTIONS = 24;
+    private static final int MAX_SCHEDULED_ACTIONS = 64;
     private static final Object GROUND_TRUTH_LOCK = new Object();
+    private static final Object METRICS_LOCK = new Object();
 
     private static final ScheduledThreadPoolExecutor ACTIONS = new ScheduledThreadPoolExecutor(
             1, daemonThreadFactory("Detective-Validation-Actions"));
@@ -43,6 +47,10 @@ public final class ValidationHarness {
             new ArrayBlockingQueue<>(32),
             daemonThreadFactory("Detective-Validation-Worker"));
     private static final AtomicBoolean STARTED = new AtomicBoolean();
+    private static final AtomicReference<PhaseObservation> CURRENT_PHASE = new AtomicReference<>();
+    private static final LongAdder POSITIVE_VALIDATIONS = new LongAdder();
+    private static final LongAdder TOP_1_MATCHES = new LongAdder();
+    private static final LongAdder TOP_3_MATCHES = new LongAdder();
 
     static {
         ACTIONS.setRemoveOnCancelPolicy(true);
@@ -84,8 +92,18 @@ public final class ValidationHarness {
             boolean incidentExpected,
             Set<Path> reportsBeforeStall
     ) {
+        validate(truth, incidentExpected, 1, reportsBeforeStall);
+    }
+
+    public static void validate(
+            ControlledFreezeGenerator.GroundTruth truth,
+            boolean incidentExpected,
+            int maximumAcceptedRank,
+            Set<Path> reportsBeforeStall
+    ) {
         try {
-            VALIDATOR.execute(() -> validateOnWorker(truth, incidentExpected, Set.copyOf(reportsBeforeStall)));
+            VALIDATOR.execute(() -> validateOnWorker(
+                    truth, incidentExpected, maximumAcceptedRank, Set.copyOf(reportsBeforeStall)));
         } catch (RejectedExecutionException e) {
             DetectiveTestCulprit.LOGGER.error("[Detective Validation] Validation queue is full; result dropped", e);
         }
@@ -95,7 +113,28 @@ public final class ValidationHarness {
         logMetricsSafely();
     }
 
+    public static void beginPhase(String phase, boolean falsePositiveEligible) {
+        Objects.requireNonNull(phase, "phase");
+        PhaseObservation next = new PhaseObservation(
+                phase,
+                falsePositiveEligible,
+                System.currentTimeMillis(),
+                System.nanoTime(),
+                captureExistingReports().size());
+        PhaseObservation previous = CURRENT_PHASE.getAndSet(next);
+        if (previous != null) {
+            finishPhase(previous);
+        }
+        DetectiveTestCulprit.LOGGER.info("[Detective Validation] PHASE {} started (falsePositiveEligible={})",
+                phase, falsePositiveEligible);
+    }
+
     public static void shutdown() {
+        PhaseObservation phase = CURRENT_PHASE.getAndSet(null);
+        if (phase != null) {
+            finishPhase(phase);
+        }
+        logAccuracy();
         ACTIONS.shutdownNow();
         VALIDATOR.shutdown();
         try {
@@ -111,6 +150,7 @@ public final class ValidationHarness {
     private static void validateOnWorker(
             ControlledFreezeGenerator.GroundTruth truth,
             boolean incidentExpected,
+            int maximumAcceptedRank,
             Set<Path> reportsBeforeStall
     ) {
         appendGroundTruth(new GroundTruthLine(truth, incidentExpected));
@@ -120,25 +160,39 @@ public final class ValidationHarness {
         ValidationResultEvaluator.Detected detected = incident == null ? null : toDetected(incident);
         ValidationResultEvaluator.Result result = ValidationResultEvaluator.evaluate(
                 new ValidationResultEvaluator.Expected(
-                        truth.expectedModId(), truth.requestedDurationMs(), incidentExpected),
+                        truth.expectedModId(), truth.requestedDurationMs(), incidentExpected, maximumAcceptedRank),
                 detected);
 
+        if (incidentExpected) {
+            POSITIVE_VALIDATIONS.increment();
+            if (result.top1Match()) {
+                TOP_1_MATCHES.increment();
+            }
+            if (result.top3Match()) {
+                TOP_3_MATCHES.increment();
+            }
+        }
+
         DetectiveTestCulprit.LOGGER.info(
-                "[Detective Validation] VALIDATION\nScenario: {}\nRequested: {} ms\nExpected: {}\nDetected #1: {}\nExpected rank: {}\nExpected share: {}%\nResult: {}\nDetails: {}",
+                "[Detective Validation] VALIDATION\nScenario: {}\nPath: {}\nRequested: {} ms\nExpected: {}\nDetected #1: {}\nExpected rank: {}\nExpected share: {}%\nTop-1: {}\nTop-3: {}\nResult: {}\nDetails: {}",
                 truth.scenarioId(),
+                truth.path(),
                 truth.requestedDurationMs(),
                 truth.expectedModId(),
                 result.detectedTopSuspect(),
                 result.expectedCulpritRank() == 0 ? "absent" : result.expectedCulpritRank(),
                 round(result.expectedCulpritSharePercent()),
+                result.top1Match() ? "PASS" : "FAIL",
+                result.top3Match() ? "PASS" : "FAIL",
                 result.passed() ? "PASS" : "FAIL",
                 result.reason());
         if (incident != null) {
             DetectiveTestCulprit.LOGGER.info(
-                    "[Detective Validation] INCIDENT duration={} ms threshold={} ms watchdogSamples={} blackBoxSamples={} dimension={} position=({}, {}, {})",
+                    "[Detective Validation] INCIDENT duration={} ms threshold={} ms watchdogSamples={} evidence={} blackBoxSamples={} dimension={} position=({}, {}, {})",
                     round(incident.durationMs()),
                     round(incident.thresholdMs()),
                     incident.watchdogSamples(),
+                    incident.attributionEvidence() == null ? "<missing>" : incident.attributionEvidence().state(),
                     incident.blackBox() == null ? 0 : incident.blackBox().size(),
                     incident.frame() == null ? "<missing>" : incident.frame().dimension(),
                     incident.frame() == null ? null : incident.frame().playerX(),
@@ -146,6 +200,7 @@ public final class ValidationHarness {
                     incident.frame() == null ? null : incident.frame().playerZ());
         }
         logMetricsSafely();
+        logAccuracy();
     }
 
     private static IncidentJson awaitIncident(
@@ -251,21 +306,110 @@ public final class ValidationHarness {
     private static void logMetricsSafely() {
         try {
             EngineMetricsSnapshot metrics = ClientPerformanceEvents.diagnostics();
+            Runtime runtime = Runtime.getRuntime();
+            long usedHeapBytes = runtime.totalMemory() - runtime.freeMemory();
+            long estimatedRetainedBytes = estimateRetainedBytes(metrics);
+            String phase = currentPhaseName();
             DetectiveTestCulprit.LOGGER.info(
-                    "[Detective Validation] OVERHEAD samples/s={} captureAvg={} us captureMax={} us retainedStacks={} blackBox={} workerQueue={}/{} dropped={} incidentsProcessed={} incidentAvg={} ms incidentMax={} ms",
+                    "[Detective Validation] OVERHEAD phase={} samples/s={} captureAvg={} us p50={} us p95={} us p99={} us captureMax={} us latencyWindow={} retainedStacks={} retainedFrames={} blackBox={} workerQueue={}/{} dropped={} incidentsProcessed={} incidentAvg={} ms incidentMax={} ms jvmHeapMiB={} detectiveRetainedEstimateKiB={}",
+                    phase,
                     round(metrics.watchdogSamplesPerSecond()),
                     round(metrics.averageWatchdogCaptureMicros()),
+                    round(metrics.p50WatchdogCaptureMicros()),
+                    round(metrics.p95WatchdogCaptureMicros()),
+                    round(metrics.p99WatchdogCaptureMicros()),
                     round(metrics.maximumWatchdogCaptureMicros()),
+                    metrics.watchdogLatencyWindowSamples(),
                     metrics.retainedWatchdogSamples(),
+                    metrics.retainedWatchdogFrames(),
                     metrics.blackBoxSamples(),
                     metrics.incidentWorkerQueueSize(),
                     metrics.incidentWorkerQueueCapacity(),
                     metrics.droppedIncidents(),
                     metrics.processedIncidents(),
                     round(metrics.averageIncidentProcessingMs()),
-                    round(metrics.maximumIncidentProcessingMs()));
+                    round(metrics.maximumIncidentProcessingMs()),
+                    round(usedHeapBytes / 1024.0 / 1024.0),
+                    round(estimatedRetainedBytes / 1024.0));
+            appendJsonLine(metricsFile(), new MetricLine(
+                    System.currentTimeMillis(),
+                    System.nanoTime(),
+                    phase,
+                    usedHeapBytes,
+                    estimatedRetainedBytes,
+                    metrics));
         } catch (RuntimeException e) {
             DetectiveTestCulprit.LOGGER.warn("[Detective Validation] Could not capture Detective overhead metrics", e);
+        }
+    }
+
+    private static long estimateRetainedBytes(EngineMetricsSnapshot metrics) {
+        // Conservative shallow-retention model; this is deliberately labelled as an estimate.
+        long blackBox = metrics.blackBoxSamples() * 128L;
+        long stacks = metrics.retainedWatchdogSamples() * 32L;
+        long frames = metrics.retainedWatchdogFrames() * 160L;
+        long queuedReferences = metrics.incidentWorkerQueueSize()
+                * (64L + metrics.blackBoxSamples() * 8L + metrics.retainedWatchdogSamples() * 8L);
+        return blackBox + stacks + frames + queuedReferences;
+    }
+
+    private static String currentPhaseName() {
+        PhaseObservation phase = CURRENT_PHASE.get();
+        return phase == null ? "startup" : phase.name();
+    }
+
+    private static void finishPhase(PhaseObservation phase) {
+        int incidentDelta = Math.max(0, captureExistingReports().size() - phase.incidentsAtStart());
+        PhaseResult result = new PhaseResult(
+                phase.name(),
+                phase.falsePositiveEligible(),
+                phase.startedEpochMs(),
+                System.currentTimeMillis(),
+                Math.max(0L, System.nanoTime() - phase.startedNanos()),
+                incidentDelta);
+        appendJsonLine(phaseFile(), result);
+        DetectiveTestCulprit.LOGGER.info(
+                "[Detective Validation] PHASE_RESULT phase={} durationMs={} incidents={} falsePositiveIncidents={}",
+                result.name(),
+                round(result.durationNanos() / 1_000_000.0),
+                result.incidentsCreated(),
+                result.falsePositiveEligible() ? result.incidentsCreated() : 0);
+    }
+
+    private static void logAccuracy() {
+        long total = POSITIVE_VALIDATIONS.sum();
+        double top1 = total == 0L ? 0.0 : TOP_1_MATCHES.sum() * 100.0 / total;
+        double top3 = total == 0L ? 0.0 : TOP_3_MATCHES.sum() * 100.0 / total;
+        DetectiveTestCulprit.LOGGER.info(
+                "[Detective Validation] ACCURACY validations={} top1={}/{} ({}%) top3={}/{} ({}%)",
+                total, TOP_1_MATCHES.sum(), total, round(top1), TOP_3_MATCHES.sum(), total, round(top3));
+    }
+
+    private static Path metricsFile() {
+        return validationDirectory().resolve("overhead-metrics.jsonl");
+    }
+
+    private static Path phaseFile() {
+        return validationDirectory().resolve("phase-results.jsonl");
+    }
+
+    private static Path validationDirectory() {
+        return FMLPaths.GAMEDIR.get().resolve("detective-validation").toAbsolutePath().normalize();
+    }
+
+    private static void appendJsonLine(Path file, Object line) {
+        synchronized (METRICS_LOCK) {
+            try {
+                Files.createDirectories(file.getParent());
+                Files.writeString(
+                        file,
+                        GSON.toJson(line) + System.lineSeparator(),
+                        StandardCharsets.UTF_8,
+                        StandardOpenOption.CREATE,
+                        StandardOpenOption.APPEND);
+            } catch (IOException e) {
+                DetectiveTestCulprit.LOGGER.warn("[Detective Validation] Could not append {}", file, e);
+            }
         }
     }
 
@@ -299,6 +443,7 @@ public final class ValidationHarness {
             double thresholdMs,
             FrameJson frame,
             int watchdogSamples,
+            AttributionEvidenceJson attributionEvidence,
             List<SuspectJson> suspects,
             List<Object> blackBox
     ) {}
@@ -306,4 +451,28 @@ public final class ValidationHarness {
     private record FrameJson(String dimension, Integer playerX, Integer playerY, Integer playerZ) {}
 
     private record SuspectJson(String modId, double sampleSharePercent) {}
+    private record AttributionEvidenceJson(String state) {}
+    private record MetricLine(
+            long epochMs,
+            long nanoTime,
+            String phase,
+            long jvmUsedHeapBytes,
+            long detectiveRetainedEstimateBytes,
+            EngineMetricsSnapshot engine
+    ) {}
+    private record PhaseObservation(
+            String name,
+            boolean falsePositiveEligible,
+            long startedEpochMs,
+            long startedNanos,
+            int incidentsAtStart
+    ) {}
+    private record PhaseResult(
+            String name,
+            boolean falsePositiveEligible,
+            long startedEpochMs,
+            long endedEpochMs,
+            long durationNanos,
+            int incidentsCreated
+    ) {}
 }

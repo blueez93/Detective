@@ -3,30 +3,27 @@ loaderVersion="[1,)"
 license="Development-only; not for distribution"
 
 [[mods]]
-modId="detective_testculprit_a"
+modId="detective_testculprit_b"
 version="0.3.0"
-displayName="Detective Test Culprit A"
+displayName="Detective Test Culprit B"
 authors="Blue"
-description='''
-Development-only controlled freeze source for Detective engine validation.
-This mod is never packaged in Detective's public JAR.
-'''
+description="Development-only indirect library culprit for Detective validation."
 
-[[dependencies.detective_testculprit_a]]
+[[dependencies.detective_testculprit_b]]
 modId="neoforge"
 type="required"
 versionRange="[21.1.235,)"
 ordering="NONE"
 side="CLIENT"
 
-[[dependencies.detective_testculprit_a]]
+[[dependencies.detective_testculprit_b]]
 modId="minecraft"
 type="required"
 versionRange="[1.21.1]"
 ordering="NONE"
 side="CLIENT"
 
-[[dependencies.detective_testculprit_a]]
+[[dependencies.detective_testculprit_b]]
 modId="detective"
 type="required"
 versionRange="[0.3.0-alpha.1,)"

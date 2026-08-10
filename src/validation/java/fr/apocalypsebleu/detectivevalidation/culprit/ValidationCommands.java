@@ -1,6 +1,7 @@
 package fr.apocalypsebleu.detectivevalidation.culprit;
 
 import com.mojang.brigadier.context.CommandContext;
+import fr.apocalypsebleu.moddetective.client.ClientPerformanceEvents;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.ConnectScreen;
 import net.minecraft.client.gui.screens.PauseScreen;
@@ -17,6 +18,9 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.RegisterClientCommandsEvent;
 import net.neoforged.neoforge.event.GameShuttingDownEvent;
+import org.lwjgl.glfw.GLFW;
+import fr.apocalypsebleu.detectivevalidation.culpritb.IndependentStallTaskB;
+import fr.apocalypsebleu.detectivevalidation.culpritc.IndependentStallTaskC;
 
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -35,6 +39,7 @@ public final class ValidationCommands {
     private static long autoconnectReadyNanos;
     private static boolean autorunTriggered;
     private static boolean autoconnectAttempted;
+    private static boolean focusRequested;
 
     private ValidationCommands() {}
 
@@ -49,6 +54,14 @@ public final class ValidationCommands {
                 .then(Commands.literal("burst").executes(ValidationCommands::runBurst))
                 .then(Commands.literal("double").executes(ValidationCommands::runDouble))
                 .then(Commands.literal("all").executes(ValidationCommands::runAll))
+                .then(Commands.literal("direct_b").executes(context -> runPath(
+                        context, "direct-b", 600L, ControlledFreezeGenerator.Path.DIRECT_B, 1)))
+                .then(Commands.literal("scheduled_c").executes(context -> runPath(
+                        context, "scheduled-c", 600L, ControlledFreezeGenerator.Path.SCHEDULED_STANDARD_C, 1)))
+                .then(Commands.literal("indirect_b").executes(context -> runPath(
+                        context, "indirect-a-b", 600L, ControlledFreezeGenerator.Path.INDIRECT_A_TO_B, 3)))
+                .then(Commands.literal("nested_c").executes(context -> runPath(
+                        context, "nested-a-b-c", 600L, ControlledFreezeGenerator.Path.NESTED_A_TO_B_TO_C, 3)))
                 .then(Commands.literal("metrics").executes(ValidationCommands::logMetrics)));
     }
 
@@ -69,11 +82,19 @@ public final class ValidationCommands {
             attemptAutoconnect(minecraft);
             return;
         }
+        if (!minecraft.isWindowActive() && !focusRequested) {
+            focusRequested = true;
+            GLFW.glfwFocusWindow(minecraft.getWindow().getWindow());
+            DetectiveTestCulprit.LOGGER.info("[Detective Validation] Requested window focus before autorun sampling");
+        }
         if (autorunWorldReadyNanos == 0L) {
             autorunWorldReadyNanos = System.nanoTime();
             return;
         }
         if (System.nanoTime() - autorunWorldReadyNanos < 3_000_000_000L) {
+            return;
+        }
+        if (ClientPerformanceEvents.diagnostics().blackBoxSamples() < 60) {
             return;
         }
 
@@ -83,14 +104,17 @@ public final class ValidationCommands {
             case "burst" -> scheduleBurst();
             case "double" -> scheduleDouble();
             case "menus" -> scheduleLifecycleChecks();
+            case "attribution" -> scheduleAttributionMatrix();
+            case "realworld" -> RealWorldValidationPlan.start();
             default -> false;
         };
         if (scheduled) {
             DetectiveTestCulprit.LOGGER.info("[Detective Validation] Autorun '{}' started after world warm-up", AUTORUN_SCENARIO);
-            if (EXIT_AFTER_AUTORUN) {
+            if (EXIT_AFTER_AUTORUN && !"realworld".equals(AUTORUN_SCENARIO)) {
                 long exitDelayMs = switch (AUTORUN_SCENARIO) {
                     case "all" -> 27_000L;
                     case "menus" -> 18_000L;
+                    case "attribution" -> 32_000L;
                     default -> 12_000L;
                 };
                 schedule(() -> {
@@ -129,6 +153,13 @@ public final class ValidationCommands {
                 server,
                 true,
                 null);
+    }
+
+    static void reconnectToConfiguredServer() {
+        if (AUTOCONNECT_SERVER.isEmpty()) {
+            return;
+        }
+        connectToLocalServer(Minecraft.getInstance());
     }
 
     private static boolean scheduleLifecycleChecks() {
@@ -174,6 +205,22 @@ public final class ValidationCommands {
         }
         runStall("below-threshold", 80L, false);
         context.getSource().sendSuccess(() -> Component.literal("Detective validation: below-threshold stall triggered"), false);
+        return 1;
+    }
+
+    private static int runPath(
+            CommandContext<CommandSourceStack> context,
+            String scenarioName,
+            long durationMs,
+            ControlledFreezeGenerator.Path path,
+            int maximumAcceptedRank
+    ) {
+        if (!worldLoaded(context)) {
+            return 0;
+        }
+        runStall(scenarioName, durationMs, true, path, maximumAcceptedRank);
+        context.getSource().sendSuccess(() -> Component.literal(
+                "Detective validation: " + scenarioName + " triggered"), false);
         return 1;
     }
 
@@ -236,13 +283,42 @@ public final class ValidationCommands {
         return true;
     }
 
+    private static boolean scheduleAttributionMatrix() {
+        if (!PLAN_RUNNING.compareAndSet(false, true)) {
+            return false;
+        }
+        schedule(RealWorldValidationPlan::focusWindow, 0L);
+        schedule(() -> runStall("attribution-direct-a", 600L, true,
+                ControlledFreezeGenerator.Path.DIRECT_A, 1), 2_000L);
+        schedule(() -> runStall("attribution-direct-b", 600L, true,
+                ControlledFreezeGenerator.Path.DIRECT_B, 1), 6_000L);
+        schedule(() -> runStall("attribution-scheduled-c", 600L, true,
+                ControlledFreezeGenerator.Path.SCHEDULED_STANDARD_C, 1), 10_000L);
+        schedule(() -> runStall("attribution-indirect-b", 600L, true,
+                ControlledFreezeGenerator.Path.INDIRECT_A_TO_B, 3), 14_000L);
+        schedule(() -> runStall("attribution-nested-c", 600L, true,
+                ControlledFreezeGenerator.Path.NESTED_A_TO_B_TO_C, 3), 18_000L);
+        schedule(() -> PLAN_RUNNING.set(false), 25_000L);
+        return true;
+    }
+
     private static int logMetrics(CommandContext<CommandSourceStack> context) {
         ValidationHarness.logMetrics();
         context.getSource().sendSuccess(() -> Component.literal("Detective validation: overhead metrics written to log"), false);
         return 1;
     }
 
-    private static void runStall(String scenarioName, long durationMs, boolean incidentExpected) {
+    static void runStall(String scenarioName, long durationMs, boolean incidentExpected) {
+        runStall(scenarioName, durationMs, incidentExpected, ControlledFreezeGenerator.Path.DIRECT_A, 1);
+    }
+
+    static void runStall(
+            String scenarioName,
+            long durationMs,
+            boolean incidentExpected,
+            ControlledFreezeGenerator.Path path,
+            int maximumAcceptedRank
+    ) {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.level == null || minecraft.player == null) {
             DetectiveTestCulprit.LOGGER.warn("[Detective Validation] Scenario '{}' skipped because no world is loaded", scenarioName);
@@ -252,8 +328,29 @@ public final class ValidationCommands {
         Set<java.nio.file.Path> reportsBeforeStall = ValidationHarness.captureExistingReports();
         String scenarioId = scenarioName + '-' + NEXT_SCENARIO.incrementAndGet();
         DetectiveTestCulprit.LOGGER.info("[Detective Validation] Triggering '{}' for {} ms on render thread", scenarioId, durationMs);
-        ControlledFreezeGenerator.GroundTruth truth = ControlledFreezeGenerator.stallRenderThread(durationMs, scenarioId);
-        ValidationHarness.validate(truth, incidentExpected, reportsBeforeStall);
+        if (path == ControlledFreezeGenerator.Path.DIRECT_B) {
+            ValidationHarness.scheduleOnRenderThread(new IndependentStallTaskB(durationMs,
+                    (startNanos, endNanos, startEpochMs, endEpochMs) -> ValidationHarness.validate(
+                            ControlledFreezeGenerator.completedGroundTruth(
+                                    scenarioId, path, durationMs, startNanos, endNanos, startEpochMs, endEpochMs),
+                            incidentExpected,
+                            maximumAcceptedRank,
+                            reportsBeforeStall)), 1L);
+            return;
+        }
+        if (path == ControlledFreezeGenerator.Path.SCHEDULED_STANDARD_C) {
+            ValidationHarness.scheduleOnRenderThread(new IndependentStallTaskC(durationMs,
+                    (startNanos, endNanos, startEpochMs, endEpochMs) -> ValidationHarness.validate(
+                            ControlledFreezeGenerator.completedGroundTruth(
+                                    scenarioId, path, durationMs, startNanos, endNanos, startEpochMs, endEpochMs),
+                            incidentExpected,
+                            maximumAcceptedRank,
+                            reportsBeforeStall)), 1L);
+            return;
+        }
+        ControlledFreezeGenerator.GroundTruth truth = ControlledFreezeGenerator.stallRenderThread(
+                durationMs, scenarioId, path);
+        ValidationHarness.validate(truth, incidentExpected, maximumAcceptedRank, reportsBeforeStall);
     }
 
     private static void schedule(Runnable action, long delayMs) {

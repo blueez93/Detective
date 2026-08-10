@@ -99,12 +99,14 @@ public final class FreezeDetector implements AutoCloseable {
         long startedNanos = metricsEnabled ? System.nanoTime() : 0L;
         try {
             SuspectAnalyzer.Analysis analysis = analyzer.analyze(stacks);
+            AttributionEvidence evidence = AttributionEvidenceClassifier.classify(stacks, analysis);
             FreezeIncident incident = new FreezeIncident(
                     frame.epochMs(),
                     frame.frameMs(),
                     threshold,
                     frame,
                     analysis.stackSamples(),
+                    evidence,
                     analysis.suspects(),
                     analysis.hotClasses(),
                     history);
@@ -127,8 +129,14 @@ public final class FreezeDetector implements AutoCloseable {
         ModDetective.LOGGER.warn("[Detective] Freeze detected: {} ms (threshold {} ms). Saved to {}",
                 round(incident.durationMs()), round(incident.thresholdMs()), saved);
 
-        if (incident.suspects().isEmpty()) {
-            ModDetective.LOGGER.warn("[Detective] No non-vanilla mod could be attributed from {} watchdog samples.", incident.watchdogSamples());
+        if (incident.attributionEvidence().state() != AttributionEvidence.State.ATTRIBUTED) {
+            ModDetective.LOGGER.warn("[Detective] No probable mod attribution from {} watchdog samples (evidence state: {}).",
+                    incident.watchdogSamples(), incident.attributionEvidence().state());
+            for (SuspectAnalyzer.Suspect observation : incident.suspects()) {
+                ModDetective.LOGGER.warn("[Detective] Weak observation: {} ({}) appeared in {} samples ({}%); not enough evidence for attribution",
+                        observation.modName(), observation.modId(), observation.samplesObserved(),
+                        round(observation.sampleSharePercent()));
+            }
             return;
         }
 

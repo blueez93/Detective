@@ -1,3 +1,8 @@
+import groovy.json.JsonSlurper
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+import java.security.MessageDigest
+
 plugins {
     id 'java-library'
     id 'maven-publish'
@@ -22,11 +27,24 @@ sourceSets {
         compileClasspath += sourceSets.main.output
         runtimeClasspath += output + compileClasspath
     }
+    validationB {
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += output + compileClasspath
+    }
+    validationC {
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += output + compileClasspath
+    }
     test {
-        compileClasspath += sourceSets.validation.output
-        runtimeClasspath += sourceSets.validation.output
+        compileClasspath += sourceSets.validation.output + sourceSets.validationB.output + sourceSets.validationC.output
+        runtimeClasspath += sourceSets.validation.output + sourceSets.validationB.output + sourceSets.validationC.output
     }
 }
+
+sourceSets.validation.compileClasspath += sourceSets.validationB.output + sourceSets.validationC.output
+sourceSets.validation.runtimeClasspath += sourceSets.validationB.output + sourceSets.validationC.output
+sourceSets.validationB.compileClasspath += sourceSets.validationC.output
+sourceSets.validationB.runtimeClasspath += sourceSets.validationC.output
 
 repositories {
 }
@@ -52,6 +70,7 @@ runs {
         def validationServer = providers.gradleProperty('detectiveValidationServer').orNull
         def validationAutorun = providers.gradleProperty('detectiveValidationAutorun').orNull
         def validationExit = providers.gradleProperty('detectiveValidationExit').orNull
+        def validationSoakMinutes = providers.gradleProperty('detectiveValidationSoakMinutes').orNull
         if (validationWorld != null) {
             arguments.addAll '--quickPlaySingleplayer', validationWorld
         }
@@ -64,8 +83,13 @@ runs {
         if (validationExit != null) {
             systemProperty 'detective.validation.exitAfterAutorun', validationExit
         }
+        if (validationSoakMinutes != null) {
+            systemProperty 'detective.validation.soakMinutes', validationSoakMinutes
+        }
         modSources {
-            add('detective_testculprit', project.sourceSets.validation)
+            add('detective_testculprit_a', project.sourceSets.validation)
+            add('detective_testculprit_b', project.sourceSets.validationB)
+            add('detective_testculprit_c', project.sourceSets.validationC)
         }
     }
 
@@ -88,6 +112,10 @@ configurations {
     runtimeClasspath.extendsFrom localRuntime
     validationImplementation.extendsFrom implementation
     validationRuntimeOnly.extendsFrom runtimeOnly
+    validationBImplementation.extendsFrom implementation
+    validationBRuntimeOnly.extendsFrom runtimeOnly
+    validationCImplementation.extendsFrom implementation
+    validationCRuntimeOnly.extendsFrom runtimeOnly
 }
 
 dependencies {
@@ -125,8 +153,104 @@ tasks.withType(Test).configureEach {
 
 tasks.named('compileTestJava').configure {
     dependsOn tasks.named('validationClasses')
+    dependsOn tasks.named('validationBClasses')
+    dependsOn tasks.named('validationCClasses')
+}
+
+tasks.named('compileValidationBJava').configure {
+    dependsOn tasks.named('validationCClasses')
 }
 
 tasks.named('check').configure {
     dependsOn tasks.named('validationClasses')
+    dependsOn tasks.named('validationBClasses')
+    dependsOn tasks.named('validationCClasses')
+}
+
+def validationPackManifest = file('validation-pack/modrinth-pack.json')
+def validationProjectPath = projectDir.absolutePath
+def validationPackTargets = { entry ->
+    def targets = []
+    if (entry.environments.contains('client')) {
+        targets.add(new File(validationProjectPath, "run/client/mods/${entry.fileName}"))
+    }
+    if (entry.environments.contains('server')) {
+        targets.add(new File(validationProjectPath, "run/server/mods/${entry.fileName}"))
+    }
+    targets
+}
+def sha512 = { File candidate ->
+    MessageDigest digest = MessageDigest.getInstance('SHA-512')
+    candidate.withInputStream { input ->
+        byte[] buffer = new byte[64 * 1024]
+        int read
+        while ((read = input.read(buffer)) >= 0) {
+            if (read > 0) {
+                digest.update(buffer, 0, read)
+            }
+        }
+    }
+    digest.digest().encodeHex().toString()
+}
+
+tasks.register('prepareValidationPack') {
+    group = 'detective validation'
+    description = 'Downloads the pinned development-only Modrinth validation pack into ignored run directories.'
+    inputs.file(validationPackManifest)
+
+    doLast {
+        def manifest = new JsonSlurper().parse(validationPackManifest)
+        manifest.mods.each { entry ->
+            validationPackTargets(entry).each { File target ->
+                target.parentFile.mkdirs()
+                if (target.isFile() && sha512(target).equalsIgnoreCase(entry.sha512)) {
+                    logger.lifecycle("Validation pack: verified ${target.name}")
+                    return
+                }
+
+                File temporary = new File(target.parentFile, ".${target.name}.download")
+                temporary.delete()
+                logger.lifecycle("Validation pack: downloading ${entry.name} ${entry.version} from Modrinth")
+                def connection = URI.create(entry.downloadUrl).toURL().openConnection()
+                connection.setRequestProperty('User-Agent', 'Detective-validation/0.3 (local development)')
+                connection.connectTimeout = 15_000
+                connection.readTimeout = 60_000
+                connection.inputStream.withCloseable { input ->
+                    temporary.withOutputStream { output -> input.transferTo(output) }
+                }
+                if (!sha512(temporary).equalsIgnoreCase(entry.sha512)) {
+                    temporary.delete()
+                    throw new GradleException("SHA-512 mismatch for ${entry.name}")
+                }
+                Files.move(temporary.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            }
+        }
+    }
+}
+
+tasks.register('verifyValidationPack') {
+    group = 'detective validation'
+    description = 'Checks every pinned validation mod against its expected SHA-512.'
+    inputs.file(validationPackManifest)
+
+    doLast {
+        def manifest = new JsonSlurper().parse(validationPackManifest)
+        manifest.mods.each { entry ->
+            validationPackTargets(entry).each { File target ->
+                if (!target.isFile()) {
+                    throw new GradleException("Missing validation mod: ${target}")
+                }
+                if (!sha512(target).equalsIgnoreCase(entry.sha512)) {
+                    throw new GradleException("SHA-512 mismatch for ${target}")
+                }
+            }
+        }
+        logger.lifecycle("Validation pack: ${manifest.mods.size()} pinned mods verified")
+    }
+}
+
+if (providers.gradleProperty('detectiveValidationPack').map(String::toBoolean).orElse(false).get()) {
+    tasks.matching { it.name == 'runClient' || it.name == 'runServer' }.configureEach {
+        dependsOn tasks.named('verifyValidationPack')
+    }
 }

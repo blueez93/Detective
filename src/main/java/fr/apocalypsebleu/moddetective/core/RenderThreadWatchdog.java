@@ -13,10 +13,12 @@ import java.util.concurrent.atomic.LongAdder;
 public final class RenderThreadWatchdog {
     private static final long SAMPLE_INTERVAL_MS = 20L;
     private static final long RETENTION_NANOS = 12_000_000_000L;
+    private static final int LATENCY_WINDOW_SAMPLES = 4_096;
 
     private final Deque<StackSnapshot> samples = new ArrayDeque<>();
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final boolean metricsEnabled;
+    private final RollingLatencyStatistics latencyWindow;
     private final LongAdder capturedSamples = new LongAdder();
     private final LongAdder captureNanos = new LongAdder();
     private final AtomicLong maximumCaptureNanos = new AtomicLong();
@@ -30,6 +32,7 @@ public final class RenderThreadWatchdog {
 
     public RenderThreadWatchdog(boolean metricsEnabled) {
         this.metricsEnabled = metricsEnabled;
+        this.latencyWindow = metricsEnabled ? new RollingLatencyStatistics(LATENCY_WINDOW_SAMPLES) : null;
     }
 
     public synchronized void start(Thread renderThread) {
@@ -80,6 +83,7 @@ public final class RenderThreadWatchdog {
                     capturedSamples.increment();
                     captureNanos.add(elapsed);
                     maximumCaptureNanos.accumulateAndGet(elapsed, Math::max);
+                    latencyWindow.record(elapsed);
                 }
             } catch (SecurityException e) {
                 running.compareAndSet(true, false);
@@ -138,22 +142,39 @@ public final class RenderThreadWatchdog {
         long started = metricsStartedNanos;
         double elapsedSeconds = started == 0L ? 0.0 : Math.max(0L, System.nanoTime() - started) / 1_000_000_000.0;
         int retained;
+        int retainedFrames = 0;
         synchronized (samples) {
             retained = samples.size();
+            for (StackSnapshot sample : samples) {
+                retainedFrames += sample.stack().length;
+            }
         }
+        RollingLatencyStatistics.Snapshot latency = metricsEnabled
+                ? latencyWindow.snapshot()
+                : new RollingLatencyStatistics.Snapshot(0, 0L, 0L, 0L);
         return new Metrics(
                 count,
                 elapsedSeconds == 0.0 ? 0.0 : count / elapsedSeconds,
                 count == 0L ? 0.0 : totalNanos / (double) count / 1_000.0,
+                latency.p50Nanos() / 1_000.0,
+                latency.p95Nanos() / 1_000.0,
+                latency.p99Nanos() / 1_000.0,
                 maximumCaptureNanos.get() / 1_000.0,
-                retained);
+                latency.samples(),
+                retained,
+                retainedFrames);
     }
 
     public record Metrics(
             long samples,
             double samplesPerSecond,
             double averageCaptureMicros,
+            double p50CaptureMicros,
+            double p95CaptureMicros,
+            double p99CaptureMicros,
             double maximumCaptureMicros,
-            int retainedSamples
+            int latencyWindowSamples,
+            int retainedSamples,
+            int retainedStackFrames
     ) {}
 }

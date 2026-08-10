@@ -7,6 +7,7 @@ import fr.apocalypsebleu.moddetective.core.FreezeDetector;
 import fr.apocalypsebleu.moddetective.core.EngineMetricsSnapshot;
 import fr.apocalypsebleu.moddetective.core.RenderThreadWatchdog;
 import fr.apocalypsebleu.moddetective.core.SuspectAnalyzer;
+import fr.apocalypsebleu.moddetective.core.SamplingContinuityGate;
 import net.minecraft.client.Minecraft;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -24,6 +25,7 @@ public final class ClientPerformanceEvents {
     private static final RenderThreadWatchdog WATCHDOG = new RenderThreadWatchdog(DEVELOPMENT_METRICS);
     private static final FreezeDetector FREEZE_DETECTOR = new FreezeDetector(
             BLACK_BOX, WATCHDOG, new SuspectAnalyzer(), DEVELOPMENT_METRICS);
+    private static final SamplingContinuityGate CONTINUITY_GATE = new SamplingContinuityGate();
 
     private static boolean watchdogStartAttempted;
     private static boolean gameplayActive;
@@ -62,8 +64,10 @@ public final class ClientPerformanceEvents {
         double frameMs = (nowNanos - frameStartNanos) / 1_000_000.0;
 
         Minecraft minecraft = Minecraft.getInstance();
-        // Pauses, lost focus, breakpoints and very long suspensions are not useful gameplay incidents.
-        if (minecraft.isPaused() || !minecraft.isWindowActive() || frameMs <= 0.0 || frameMs > MAX_USEFUL_FRAME_MS) {
+        // Pauses and lost focus are not gameplay incidents. Skip the first resumed frame too,
+        // because its duration still contains part of the suspended interval.
+        if (!CONTINUITY_GATE.shouldRecord(!minecraft.isPaused() && minecraft.isWindowActive())
+                || frameMs <= 0.0 || frameMs > MAX_USEFUL_FRAME_MS) {
             return;
         }
 
@@ -116,8 +120,13 @@ public final class ClientPerformanceEvents {
                 watchdog.samples(),
                 watchdog.samplesPerSecond(),
                 watchdog.averageCaptureMicros(),
+                watchdog.p50CaptureMicros(),
+                watchdog.p95CaptureMicros(),
+                watchdog.p99CaptureMicros(),
                 watchdog.maximumCaptureMicros(),
+                watchdog.latencyWindowSamples(),
                 watchdog.retainedSamples(),
+                watchdog.retainedStackFrames(),
                 BLACK_BOX.size(),
                 detector.queueSize(),
                 detector.queueCapacity(),

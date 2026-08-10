@@ -10,12 +10,12 @@ public final class ValidationResultEvaluator {
         Objects.requireNonNull(expected, "expected");
         if (!expected.incidentExpected()) {
             return detected == null
-                    ? new Result(true, 0, "<none>", 0.0, "No incident created, as expected")
+                    ? new Result(true, 0, "<none>", 0.0, false, false, "No incident created, as expected")
                     : new Result(false, rankOf(expected.modId(), detected.suspects()), detected.topSuspect(),
-                    shareOf(expected.modId(), detected.suspects()), "Unexpected incident created");
+                    shareOf(expected.modId(), detected.suspects()), false, false, "Unexpected incident created");
         }
         if (detected == null) {
-            return new Result(false, 0, "<none>", 0.0, "No incident report was created");
+            return new Result(false, 0, "<none>", 0.0, false, false, "No incident report was created");
         }
 
         int rank = rankOf(expected.modId(), detected.suspects());
@@ -25,21 +25,23 @@ public final class ValidationResultEvaluator {
         boolean complete = detected.watchdogSamples() > 0
                 && detected.blackBoxSamples() > 0
                 && detected.hasWorldLocation();
-        boolean passed = rank == 1 && durationCoherent && complete;
+        boolean top1 = rank == 1;
+        boolean top3 = rank > 0 && rank <= 3;
+        boolean passed = rank > 0 && rank <= expected.maximumAcceptedRank() && durationCoherent && complete;
 
         String reason;
         if (rank == 0) {
             reason = "Expected culprit is absent from suspects";
-        } else if (rank != 1) {
-            reason = "Expected culprit is ranked #" + rank;
+        } else if (rank > expected.maximumAcceptedRank()) {
+            reason = "Expected culprit is ranked #" + rank + " (required top " + expected.maximumAcceptedRank() + ")";
         } else if (!durationCoherent) {
             reason = "Incident duration is inconsistent with the requested stall";
         } else if (!complete) {
             reason = "Incident is missing watchdog, Black Box, dimension, or position data";
         } else {
-            reason = "Expected culprit is ranked first with complete incident evidence";
+            reason = "Expected culprit is within required rank with complete incident evidence";
         }
-        return new Result(passed, rank, detected.topSuspect(), share, reason);
+        return new Result(passed, rank, detected.topSuspect(), share, top1, top3, reason);
     }
 
     private static int rankOf(String expectedModId, List<Suspect> suspects) {
@@ -59,9 +61,16 @@ public final class ValidationResultEvaluator {
                 .orElse(0.0);
     }
 
-    public record Expected(String modId, long requestedDurationMs, boolean incidentExpected) {
+    public record Expected(String modId, long requestedDurationMs, boolean incidentExpected, int maximumAcceptedRank) {
         public Expected {
             Objects.requireNonNull(modId, "modId");
+            if (maximumAcceptedRank < 1) {
+                throw new IllegalArgumentException("maximumAcceptedRank must be positive");
+            }
+        }
+
+        public Expected(String modId, long requestedDurationMs, boolean incidentExpected) {
+            this(modId, requestedDurationMs, incidentExpected, 1);
         }
     }
 
@@ -88,6 +97,8 @@ public final class ValidationResultEvaluator {
             int expectedCulpritRank,
             String detectedTopSuspect,
             double expectedCulpritSharePercent,
+            boolean top1Match,
+            boolean top3Match,
             String reason
     ) {}
 }
