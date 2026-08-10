@@ -7,6 +7,8 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.LongAdder;
 
 public final class RenderThreadWatchdog {
     private static final long SAMPLE_INTERVAL_MS = 20L;
@@ -14,8 +16,21 @@ public final class RenderThreadWatchdog {
 
     private final Deque<StackSnapshot> samples = new ArrayDeque<>();
     private final AtomicBoolean running = new AtomicBoolean(false);
+    private final boolean metricsEnabled;
+    private final LongAdder capturedSamples = new LongAdder();
+    private final LongAdder captureNanos = new LongAdder();
+    private final AtomicLong maximumCaptureNanos = new AtomicLong();
     private volatile Thread renderThread;
     private volatile Thread samplerThread;
+    private volatile long metricsStartedNanos;
+
+    public RenderThreadWatchdog() {
+        this(false);
+    }
+
+    public RenderThreadWatchdog(boolean metricsEnabled) {
+        this.metricsEnabled = metricsEnabled;
+    }
 
     public synchronized void start(Thread renderThread) {
         if (renderThread == null) {
@@ -26,14 +41,14 @@ public final class RenderThreadWatchdog {
         }
 
         this.renderThread = renderThread;
-        Thread sampler = new Thread(this::runLoop, "ModDetective-Watchdog");
+        Thread sampler = new Thread(this::runLoop, "Detective-Watchdog");
         sampler.setDaemon(true);
         sampler.setPriority(Thread.NORM_PRIORITY - 1);
         sampler.setUncaughtExceptionHandler((thread, error) ->
-                ModDetective.LOGGER.error("[Mod Detective] Watchdog thread stopped unexpectedly", error));
+                ModDetective.LOGGER.error("[Detective] Watchdog thread stopped unexpectedly", error));
         this.samplerThread = sampler;
         sampler.start();
-        ModDetective.LOGGER.info("[Mod Detective] Watchdog attached to render thread '{}'", renderThread.getName());
+        ModDetective.LOGGER.info("[Detective] Watchdog attached to render thread '{}'", renderThread.getName());
     }
 
     private void runLoop() {
@@ -47,6 +62,9 @@ public final class RenderThreadWatchdog {
 
             try {
                 long now = System.nanoTime();
+                if (metricsEnabled && metricsStartedNanos == 0L) {
+                    metricsStartedNanos = now;
+                }
                 StackTraceElement[] stack = thread.getStackTrace();
                 if (stack.length > 0) {
                     synchronized (samples) {
@@ -57,9 +75,15 @@ public final class RenderThreadWatchdog {
                         }
                     }
                 }
+                if (metricsEnabled) {
+                    long elapsed = System.nanoTime() - now;
+                    capturedSamples.increment();
+                    captureNanos.add(elapsed);
+                    maximumCaptureNanos.accumulateAndGet(elapsed, Math::max);
+                }
             } catch (SecurityException e) {
                 running.compareAndSet(true, false);
-                ModDetective.LOGGER.warn("[Mod Detective] Watchdog cannot sample the render thread", e);
+                ModDetective.LOGGER.warn("[Detective] Watchdog cannot sample the render thread", e);
                 return;
             }
 
@@ -79,9 +103,16 @@ public final class RenderThreadWatchdog {
         renderThread = null;
         if (sampler != null) {
             sampler.interrupt();
+            if (sampler != Thread.currentThread()) {
+                try {
+                    sampler.join(1_000L);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
         }
         if (wasRunning || sampler != null) {
-            ModDetective.LOGGER.info("[Mod Detective] Watchdog stopped");
+            ModDetective.LOGGER.info("[Detective] Watchdog stopped");
         }
     }
 
@@ -100,4 +131,29 @@ public final class RenderThreadWatchdog {
             return List.copyOf(result);
         }
     }
+
+    public Metrics metrics() {
+        long count = capturedSamples.sum();
+        long totalNanos = captureNanos.sum();
+        long started = metricsStartedNanos;
+        double elapsedSeconds = started == 0L ? 0.0 : Math.max(0L, System.nanoTime() - started) / 1_000_000_000.0;
+        int retained;
+        synchronized (samples) {
+            retained = samples.size();
+        }
+        return new Metrics(
+                count,
+                elapsedSeconds == 0.0 ? 0.0 : count / elapsedSeconds,
+                count == 0L ? 0.0 : totalNanos / (double) count / 1_000.0,
+                maximumCaptureNanos.get() / 1_000.0,
+                retained);
+    }
+
+    public record Metrics(
+            long samples,
+            double samplesPerSecond,
+            double averageCaptureMicros,
+            double maximumCaptureMicros,
+            int retainedSamples
+    ) {}
 }

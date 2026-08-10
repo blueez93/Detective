@@ -1,0 +1,34 @@
+modLoader="javafml"
+loaderVersion="[1,)"
+license="All Rights Reserved"
+
+[[mods]]
+modId="detective_testculprit"
+version="0.2.0"
+displayName="Detective Test Culprit"
+authors="Blue"
+description='''
+Development-only controlled freeze source for Detective engine validation.
+This mod is never packaged in Detective's public JAR.
+'''
+
+[[dependencies.detective_testculprit]]
+modId="neoforge"
+type="required"
+versionRange="[21.1.235,)"
+ordering="NONE"
+side="CLIENT"
+
+[[dependencies.detective_testculprit]]
+modId="minecraft"
+type="required"
+versionRange="[1.21.1]"
+ordering="NONE"
+side="CLIENT"
+
+[[dependencies.detective_testculprit]]
+modId="detective"
+type="required"
+versionRange="[0.2.0-alpha.1,)"
+ordering="AFTER"
+side="CLIENT"

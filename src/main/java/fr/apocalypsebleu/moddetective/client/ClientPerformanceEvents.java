@@ -4,6 +4,7 @@ import fr.apocalypsebleu.moddetective.ModDetective;
 import fr.apocalypsebleu.moddetective.core.BlackBoxRecorder;
 import fr.apocalypsebleu.moddetective.core.FrameSample;
 import fr.apocalypsebleu.moddetective.core.FreezeDetector;
+import fr.apocalypsebleu.moddetective.core.EngineMetricsSnapshot;
 import fr.apocalypsebleu.moddetective.core.RenderThreadWatchdog;
 import fr.apocalypsebleu.moddetective.core.SuspectAnalyzer;
 import net.minecraft.client.Minecraft;
@@ -17,10 +18,12 @@ import net.neoforged.neoforge.event.GameShuttingDownEvent;
 public final class ClientPerformanceEvents {
     private static final double MAX_USEFUL_FRAME_MS = 10_000.0;
     private static final long FAILURE_LOG_INTERVAL_NANOS = 10_000_000_000L;
+    private static final boolean DEVELOPMENT_METRICS = Boolean.getBoolean("detective.validation.enabled");
 
     private static final BlackBoxRecorder BLACK_BOX = new BlackBoxRecorder();
-    private static final RenderThreadWatchdog WATCHDOG = new RenderThreadWatchdog();
-    private static final FreezeDetector FREEZE_DETECTOR = new FreezeDetector(BLACK_BOX, WATCHDOG, new SuspectAnalyzer());
+    private static final RenderThreadWatchdog WATCHDOG = new RenderThreadWatchdog(DEVELOPMENT_METRICS);
+    private static final FreezeDetector FREEZE_DETECTOR = new FreezeDetector(
+            BLACK_BOX, WATCHDOG, new SuspectAnalyzer(), DEVELOPMENT_METRICS);
 
     private static boolean watchdogStartAttempted;
     private static boolean gameplayActive;
@@ -38,7 +41,7 @@ public final class ClientPerformanceEvents {
         } catch (RuntimeException e) {
             if (lastFailureLogNanos == Long.MIN_VALUE || nowNanos - lastFailureLogNanos >= FAILURE_LOG_INTERVAL_NANOS) {
                 lastFailureLogNanos = nowNanos;
-                ModDetective.LOGGER.error("[Mod Detective] Performance sampling failed; the game will continue", e);
+                ModDetective.LOGGER.error("[Detective] Performance sampling failed; the game will continue", e);
             }
         }
     }
@@ -104,6 +107,24 @@ public final class ClientPerformanceEvents {
             gameplayActive = false;
             FREEZE_DETECTOR.resetBaseline();
         }
+    }
+
+    public static EngineMetricsSnapshot diagnostics() {
+        RenderThreadWatchdog.Metrics watchdog = WATCHDOG.metrics();
+        FreezeDetector.Metrics detector = FREEZE_DETECTOR.metrics();
+        return new EngineMetricsSnapshot(
+                watchdog.samples(),
+                watchdog.samplesPerSecond(),
+                watchdog.averageCaptureMicros(),
+                watchdog.maximumCaptureMicros(),
+                watchdog.retainedSamples(),
+                BLACK_BOX.size(),
+                detector.queueSize(),
+                detector.queueCapacity(),
+                detector.droppedIncidents(),
+                detector.processedIncidents(),
+                detector.averageProcessingMs(),
+                detector.maximumProcessingMs());
     }
 
     @SubscribeEvent

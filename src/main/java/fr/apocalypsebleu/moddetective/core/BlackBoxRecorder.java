@@ -20,4 +20,8 @@ public final class BlackBoxRecorder {
     public synchronized List<FrameSample> snapshot() {
         return List.copyOf(new ArrayList<>(samples));
     }
+
+    public synchronized int size() {
+        return samples.size();
+    }
 }

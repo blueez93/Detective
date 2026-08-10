@@ -18,7 +18,7 @@ public final class AtomicFiles {
         }
 
         Files.createDirectories(parent);
-        Path temporary = Files.createTempFile(parent, ".moddetective-", ".tmp");
+        Path temporary = Files.createTempFile(parent, ".detective-", ".tmp");
         try {
             Files.writeString(temporary, content, StandardCharsets.UTF_8);
             try {

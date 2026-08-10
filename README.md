@@ -1,60 +1,75 @@
-# Mod Detective — v0.1 engine validation
+# Detective — v0.2 Controlled Validation Harness
 
 Minecraft 1.21.1 / NeoForge 21.1.235 / Java 21.
 
-## Implemented engine
+Detective is a client-only diagnostic mod that records evidence around render-thread freezes and ranks the non-vanilla mods observed in watchdog stack samples. A suspect score is evidence, not proof of causality.
 
-- Captures the loaded mod list + versions at startup.
-- Compares the current list against the previous launch.
-- Stores a SHA-256 fingerprint of the pack state.
-- Keeps a 30-second rolling black box of frame time, approximate FPS, JVM memory, dimension and player position.
-- Runs a lifecycle-managed, low-priority watchdog that samples the Minecraft render thread every 20 ms.
-- Detects abnormal frames with an adaptive threshold: max(120 ms, 6x rolling median frame time).
-- On a detected freeze, inspects watchdog samples from the exact frame interval.
-- Attributes stack classes through NeoForge SecureJar package metadata, with a code-source fallback.
-- Ranks up to five suspects by the percentage of freeze samples in which their code appeared.
-- Analyzes and saves incidents away from the render thread.
-- Atomically saves JSON reports under `<game directory>/moddetective/incidents/`.
+## Production engine
 
-## Build
+- Captures installed mods and versions, then compares them with the previous launch.
+- Keeps a 30-second Black Box of frame time, FPS, JVM memory, dimension, and player position.
+- Samples the render thread every 20 ms from an independent low-priority watchdog.
+- Detects freezes at `max(120 ms, 6 × rolling median frame time)` after a warm-up baseline.
+- Resolves Java classes and JAR/package ownership through NeoForge metadata.
+- Ranks up to five suspects by their share of watchdog samples.
+- Processes incidents on a bounded worker queue and atomically stores JSON under `<game directory>/detective/incidents/`.
+- Performs no network calls or telemetry and is not required on a server.
 
-The repository includes the standard Gradle 9.2.1 wrapper used by the current NeoForge 1.21.1 NeoGradle MDK. A Java 21 JDK is required.
+The internal Java package remains `fr.apocalypsebleu.moddetective` for v0.2 to avoid a high-risk package-only rename. The public mod id, artifact, display name, assets, logs, and data directory are all `detective`/`Detective`.
 
-On Windows:
+## Legacy data migration
+
+At startup, Detective checks `<game directory>/moddetective`. If the new `detective` directory does not exist, the legacy directory is moved as a unit. If both exist, non-conflicting files are moved into `detective`; conflicting files are left untouched in the legacy directory.
+
+## Development validation mod
+
+`src/validation` contains the separate NeoForge mod `detective_testculprit`. NeoGradle adds it only to `runClient`; it is never part of `build/libs/detective-<version>.jar`.
+
+With a world loaded, these local client commands are available:
+
+```text
+/detective_validate 150
+/detective_validate 300
+/detective_validate 600
+/detective_validate 1200
+/detective_validate below
+/detective_validate burst
+/detective_validate double
+/detective_validate all
+/detective_validate metrics
+```
+
+`all` schedules the four primary durations and an 80 ms negative case. `burst` schedules four 150 ms stalls inside the debounce window. `double` schedules two 600 ms freezes farther apart than the two-second debounce.
+
+Ground truth is written separately to `run/client/detective-validation/ground-truth.jsonl`. A validation worker reads newly produced incident JSON and logs `Expected`, `Detected #1`, rank, sample share, completeness, and `PASS`/`FAIL`. Ground truth is never passed to Detective's detection or attribution code.
+
+## Build and test
+
+The repository includes the Gradle 9.2.1 wrapper. A Java 21 JDK is required.
 
 ```powershell
 .\gradlew.bat build
+.\gradlew.bat test
 .\gradlew.bat runClient
 ```
 
-On Linux/macOS:
+For unattended local validation against an existing world named `DetectiveValidation`:
 
-```text
-./gradlew build
-./gradlew runClient
+```powershell
+.\gradlew.bat runClient -PdetectiveValidationWorld=DetectiveValidation -PdetectiveValidationAutorun=all -PdetectiveValidationExit=true
 ```
 
-Focused JUnit tests cover adaptive freeze thresholds, snapshot comparisons, Black Box retention, and suspect ranking.
+The same autorun can connect to a local validation server with `-PdetectiveValidationServer=127.0.0.1` instead of the singleplayer world property. This development-only path waits for client loading to finish and then uses Minecraft's normal `ConnectScreen` API.
 
-## First test
+The build compiles the validation source set so harness API breakage is caught, but the public JAR task packages only `sourceSets.main`.
 
-Launch a world and play for a minute. Mod Detective should create:
+During a development run, inspect:
 
-- `run/client/moddetective/snapshots/last-session.json` in a dev run.
-- JSON reports in `run/client/moddetective/incidents/` when a long frame is detected.
+- `run/client/logs/latest.log` for `[Detective]` and `[Detective Validation]`;
+- `run/client/detective/snapshots/last-session.json`;
+- `run/client/detective/incidents/*.json`;
+- `run/client/detective-validation/ground-truth.jsonl`.
 
-In `run/client/logs/latest.log`, search for `[Mod Detective]`. On normal shutdown, the log should also report that the watchdog stopped.
+## Scope
 
-## Design rule
-
-A suspect score is **evidence**, not proof. A mod appearing in a sampled stack during a freeze is correlated with the freeze, but the root cause can be another mod, vanilla code, a driver, GC, disk I/O, or a dependency. The UI must always communicate this as a confidence/suspicion score rather than an accusation.
-
-## Next milestone — v0.2 UI
-
-1. F8 (or configurable key) opens the Mod Detective dashboard.
-2. Timeline of the last 30 seconds.
-3. Incident cards with duration, position, RAM and suspects.
-4. “What changed?” screen showing added/removed/updated mods.
-5. Export Support Report ZIP.
-6. Better class-to-mod resolution for nested/Jar-in-Jar mods.
-7. GC pause sampling and chunk/entity counters.
+v0.2 validates the engine. It deliberately excludes the final dashboard, graphics work, cloud uploads, telemetry, server profiling, Fabric support, monetization, update services, and natural-language diagnosis.

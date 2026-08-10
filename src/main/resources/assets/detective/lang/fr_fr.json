@@ -1,0 +1,4 @@
+{
+  "detective.freeze.detected": "Detective a détecté un freeze de %s ms",
+  "detective.suspect.none": "Aucun mod suspect n'a pu être identifié"
+}

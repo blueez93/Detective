@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SuspectAnalyzerTest {
     @Test
@@ -31,6 +32,32 @@ class SuspectAnalyzerTest {
         assertEquals(2, analysis.suspects().get(1).samplesObserved());
         assertEquals(1, analysis.suspects().get(2).samplesObserved());
         assertEquals(2.0 / 3.0 * 100.0, analysis.suspects().get(0).sampleSharePercent(), 0.0001);
+    }
+
+    @Test
+    void breaksEqualScoresDeterministicallyByModId() {
+        Map<String, ModSourceResolver.ResolvedMod> owners = Map.of(
+                "example.zeta.Work", mod("zeta"),
+                "example.alpha.Work", mod("alpha"));
+        SuspectAnalyzer analyzer = new SuspectAnalyzer(className -> Optional.ofNullable(owners.get(className)));
+
+        SuspectAnalyzer.Analysis analysis = analyzer.analyze(List.of(
+                stack(1L, "example.zeta.Work"),
+                stack(2L, "example.alpha.Work")));
+
+        assertEquals(List.of("alpha", "zeta"),
+                analysis.suspects().stream().map(SuspectAnalyzer.Suspect::modId).toList());
+    }
+
+    @Test
+    void returnsEmptyAnalysisWithoutStackSamples() {
+        SuspectAnalyzer analyzer = new SuspectAnalyzer(className -> Optional.of(mod("unexpected")));
+
+        SuspectAnalyzer.Analysis analysis = analyzer.analyze(List.of());
+
+        assertEquals(0, analysis.stackSamples());
+        assertTrue(analysis.suspects().isEmpty());
+        assertTrue(analysis.hotClasses().isEmpty());
     }
 
     private static ModSourceResolver.ResolvedMod mod(String id) {

@@ -8,7 +8,7 @@ version="${mod_version}"
 displayName="${mod_name}"
 authors="Blue"
 description='''
-Mod Detective watches Minecraft performance and helps identify which mod is most likely responsible for freezes and regressions.
+Detective watches Minecraft performance and helps identify which mod is most likely responsible for freezes and regressions.
 ''' 
 
 [[dependencies.${mod_id}]]

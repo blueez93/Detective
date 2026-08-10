@@ -10,7 +10,7 @@ import org.slf4j.Logger;
 
 @Mod(value = ModDetective.MOD_ID, dist = Dist.CLIENT)
 public final class ModDetective {
-    public static final String MOD_ID = "moddetective";
+    public static final String MOD_ID = "detective";
     public static final Logger LOGGER = LogUtils.getLogger();
 
     public ModDetective(IEventBus modEventBus) {
@@ -21,17 +21,17 @@ public final class ModDetective {
         event.enqueueWork(() -> {
             try {
                 var diff = ModSnapshotService.captureAndPersist();
-                LOGGER.info("[Mod Detective] Ready: {} loaded mods, {} change(s) since the previous session",
+                LOGGER.info("[Detective] Ready: {} loaded mods, {} change(s) since the previous session",
                         diff.current().mods().size(), diff.totalChanges());
 
                 if (diff.totalChanges() > 0) {
-                    diff.added().forEach(mod -> LOGGER.info("[Mod Detective] Added: {} {}", mod.id(), mod.version()));
-                    diff.removed().forEach(mod -> LOGGER.info("[Mod Detective] Removed: {} {}", mod.id(), mod.version()));
-                    diff.updated().forEach(change -> LOGGER.info("[Mod Detective] Updated: {} {} -> {}",
+                    diff.added().forEach(mod -> LOGGER.info("[Detective] Added: {} {}", mod.id(), mod.version()));
+                    diff.removed().forEach(mod -> LOGGER.info("[Detective] Removed: {} {}", mod.id(), mod.version()));
+                    diff.updated().forEach(change -> LOGGER.info("[Detective] Updated: {} {} -> {}",
                             change.id(), change.oldVersion(), change.newVersion()));
                 }
             } catch (RuntimeException e) {
-                LOGGER.error("[Mod Detective] Snapshot initialization failed; performance monitoring will remain available", e);
+                LOGGER.error("[Detective] Snapshot initialization failed; performance monitoring will remain available", e);
             }
         });
     }

@@ -11,33 +11,50 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.LongAdder;
 
 public final class FreezeDetector implements AutoCloseable {
     private static final int BASELINE_WINDOW = 180;
     private static final int MINIMUM_BASELINE_SAMPLES = 30;
     private static final double MAX_BASELINE_FRAME_MS = FreezeThreshold.ABSOLUTE_MINIMUM_MS;
     private static final long INCIDENT_DEBOUNCE_MS = 2_000L;
+    private static final int INCIDENT_QUEUE_CAPACITY = 8;
 
     private final Deque<Double> recentFrames = new ArrayDeque<>();
     private final BlackBoxRecorder blackBox;
     private final RenderThreadWatchdog watchdog;
     private final SuspectAnalyzer analyzer;
+    private final boolean metricsEnabled;
     private final ThreadPoolExecutor incidentWorker;
-
-    private long lastIncidentEndNanos = Long.MIN_VALUE;
+    private final IncidentDebounce debounce = new IncidentDebounce(TimeUnit.MILLISECONDS.toNanos(INCIDENT_DEBOUNCE_MS));
+    private final LongAdder droppedIncidents = new LongAdder();
+    private final LongAdder processedIncidents = new LongAdder();
+    private final LongAdder incidentProcessingNanos = new LongAdder();
+    private final AtomicLong maximumIncidentProcessingNanos = new AtomicLong();
 
     public FreezeDetector(BlackBoxRecorder blackBox, RenderThreadWatchdog watchdog, SuspectAnalyzer analyzer) {
+        this(blackBox, watchdog, analyzer, false);
+    }
+
+    public FreezeDetector(
+            BlackBoxRecorder blackBox,
+            RenderThreadWatchdog watchdog,
+            SuspectAnalyzer analyzer,
+            boolean metricsEnabled
+    ) {
         this.blackBox = blackBox;
         this.watchdog = watchdog;
         this.analyzer = analyzer;
+        this.metricsEnabled = metricsEnabled;
         this.incidentWorker = new ThreadPoolExecutor(
                 1,
                 1,
                 0L,
                 TimeUnit.MILLISECONDS,
-                new ArrayBlockingQueue<>(8),
+                new ArrayBlockingQueue<>(INCIDENT_QUEUE_CAPACITY),
                 task -> {
-                    Thread thread = new Thread(task, "ModDetective-IncidentWorker");
+                    Thread thread = new Thread(task, "Detective-IncidentWorker");
                     thread.setDaemon(true);
                     thread.setPriority(Thread.NORM_PRIORITY - 1);
                     return thread;
@@ -46,13 +63,9 @@ public final class FreezeDetector implements AutoCloseable {
 
     public void accept(FrameSample frame, long frameStartNanos, long frameEndNanos) {
         boolean enoughBaseline = recentFrames.size() >= MINIMUM_BASELINE_SAMPLES;
-        boolean debounced = lastIncidentEndNanos == Long.MIN_VALUE
-                || frameEndNanos - lastIncidentEndNanos >= TimeUnit.MILLISECONDS.toNanos(INCIDENT_DEBOUNCE_MS);
-
-        if (enoughBaseline && debounced && frame.frameMs() >= FreezeThreshold.ABSOLUTE_MINIMUM_MS) {
+        if (enoughBaseline && frame.frameMs() >= FreezeThreshold.ABSOLUTE_MINIMUM_MS) {
             double threshold = FreezeThreshold.calculate(recentFrames);
-            if (frame.frameMs() >= threshold) {
-                lastIncidentEndNanos = frameEndNanos;
+            if (frame.frameMs() >= threshold && debounce.tryAcquire(frameEndNanos)) {
                 submitIncident(frame, threshold,
                         watchdog.between(frameStartNanos, frameEndNanos),
                         blackBox.snapshot());
@@ -70,18 +83,20 @@ public final class FreezeDetector implements AutoCloseable {
 
     public void resetBaseline() {
         recentFrames.clear();
-        lastIncidentEndNanos = Long.MIN_VALUE;
+        debounce.reset();
     }
 
     private void submitIncident(FrameSample frame, double threshold, List<StackSnapshot> stacks, List<FrameSample> history) {
         try {
             incidentWorker.execute(() -> processIncident(frame, threshold, stacks, history));
         } catch (RejectedExecutionException e) {
-            ModDetective.LOGGER.warn("[Mod Detective] Incident processing queue is full or shutting down; report dropped", e);
+            droppedIncidents.increment();
+            ModDetective.LOGGER.warn("[Detective] Incident processing queue is full or shutting down; report dropped");
         }
     }
 
     private void processIncident(FrameSample frame, double threshold, List<StackSnapshot> stacks, List<FrameSample> history) {
+        long startedNanos = metricsEnabled ? System.nanoTime() : 0L;
         try {
             SuspectAnalyzer.Analysis analysis = analyzer.analyze(stacks);
             FreezeIncident incident = new FreezeIncident(
@@ -97,22 +112,29 @@ public final class FreezeDetector implements AutoCloseable {
             Path saved = IncidentStore.save(incident);
             logIncident(incident, saved);
         } catch (IOException | RuntimeException e) {
-            ModDetective.LOGGER.error("[Mod Detective] Unable to analyze or save a freeze incident", e);
+            ModDetective.LOGGER.error("[Detective] Unable to analyze or save a freeze incident", e);
+        } finally {
+            if (metricsEnabled) {
+                long elapsed = System.nanoTime() - startedNanos;
+                processedIncidents.increment();
+                incidentProcessingNanos.add(elapsed);
+                maximumIncidentProcessingNanos.accumulateAndGet(elapsed, Math::max);
+            }
         }
     }
 
     private static void logIncident(FreezeIncident incident, Path saved) {
-        ModDetective.LOGGER.warn("[Mod Detective] Freeze detected: {} ms (threshold {} ms). Saved to {}",
+        ModDetective.LOGGER.warn("[Detective] Freeze detected: {} ms (threshold {} ms). Saved to {}",
                 round(incident.durationMs()), round(incident.thresholdMs()), saved);
 
         if (incident.suspects().isEmpty()) {
-            ModDetective.LOGGER.warn("[Mod Detective] No non-vanilla mod could be attributed from {} watchdog samples.", incident.watchdogSamples());
+            ModDetective.LOGGER.warn("[Detective] No non-vanilla mod could be attributed from {} watchdog samples.", incident.watchdogSamples());
             return;
         }
 
         for (int i = 0; i < incident.suspects().size(); i++) {
             SuspectAnalyzer.Suspect suspect = incident.suspects().get(i);
-            ModDetective.LOGGER.warn("[Mod Detective] Suspect #{}: {} ({}) observed in {}% of freeze samples",
+            ModDetective.LOGGER.warn("[Detective] Suspect #{}: {} ({}) observed in {}% of freeze samples",
                     i + 1, suspect.modName(), suspect.modId(), round(suspect.sampleSharePercent()));
         }
     }
@@ -120,6 +142,27 @@ public final class FreezeDetector implements AutoCloseable {
     private static double round(double value) {
         return Math.round(value * 10.0) / 10.0;
     }
+
+    public Metrics metrics() {
+        long processed = processedIncidents.sum();
+        long totalNanos = incidentProcessingNanos.sum();
+        return new Metrics(
+                incidentWorker.getQueue().size(),
+                INCIDENT_QUEUE_CAPACITY,
+                droppedIncidents.sum(),
+                processed,
+                processed == 0L ? 0.0 : totalNanos / (double) processed / 1_000_000.0,
+                maximumIncidentProcessingNanos.get() / 1_000_000.0);
+    }
+
+    public record Metrics(
+            int queueSize,
+            int queueCapacity,
+            long droppedIncidents,
+            long processedIncidents,
+            double averageProcessingMs,
+            double maximumProcessingMs
+    ) {}
 
     @Override
     public void close() {

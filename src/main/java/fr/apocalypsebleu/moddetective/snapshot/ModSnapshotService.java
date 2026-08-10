@@ -35,7 +35,7 @@ public final class ModSnapshotService {
             previous = readPrevious(target);
             AtomicFiles.writeUtf8(target, GSON.toJson(current));
         } catch (IOException | RuntimeException e) {
-            ModDetective.LOGGER.error("[Mod Detective] Unable to persist the mod snapshot", e);
+            ModDetective.LOGGER.error("[Detective] Unable to persist the mod snapshot", e);
         }
 
         return ModSnapshotDiff.between(previous, current);
@@ -78,7 +78,7 @@ public final class ModSnapshotService {
             }
             return snapshot;
         } catch (Exception e) {
-            ModDetective.LOGGER.warn("[Mod Detective] Unable to read the previous snapshot; treating this as the first run", e);
+            ModDetective.LOGGER.warn("[Detective] Unable to read the previous snapshot; treating this as the first run", e);
             return null;
         }
     }

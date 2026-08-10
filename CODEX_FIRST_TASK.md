@@ -2,7 +2,7 @@
 
 Work directly in this repository.
 
-Goal: turn the existing Mod Detective v0.1 engine into a clean, compilable, launchable Minecraft 1.21.1 NeoForge client-side mod on Java 21.
+Goal: turn the existing Detective v0.1 engine into a clean, compilable, launchable Minecraft 1.21.1 NeoForge client-side mod on Java 21.
 
 Do not add the full GUI yet.
 
@@ -16,7 +16,7 @@ Tasks:
 7. Make client-only registration safe so the mod does not accidentally load client classes in an inappropriate environment.
 8. Add small focused tests for pure Java logic where useful (for example freeze thresholding, snapshot diffing, suspect ranking) if the project setup supports them cleanly.
 9. Run the build/tests again.
-10. If possible, launch runClient far enough to verify Mod Detective loads. Inspect the log for exceptions originating from the mod.
+10. If possible, launch runClient far enough to verify Detective loads. Inspect the log for exceptions originating from the mod.
 
 Do not hide failures. If Minecraft cannot be launched because of environment limitations, leave the repository buildable and state exactly what remains unverified.
 

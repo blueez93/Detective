@@ -62,7 +62,7 @@ public final class ModSourceResolver {
 
         ModList modList = ModList.get();
         if (modList == null) {
-            ModDetective.LOGGER.warn("[Mod Detective] Mod list is unavailable; class attribution is disabled for this session");
+            ModDetective.LOGGER.warn("[Detective] Mod list is unavailable; class attribution is disabled for this session");
             return new SourceIndex(Map.of(), List.of());
         }
 
@@ -81,7 +81,7 @@ public final class ModSourceResolver {
                     packageOwners.merge(packageName, owner, ModSourceResolver::preferUnambiguousOwner);
                 }
             } catch (RuntimeException e) {
-                ModDetective.LOGGER.debug("[Mod Detective] Unable to index a mod file for class attribution", e);
+                ModDetective.LOGGER.debug("[Detective] Unable to index a mod file for class attribution", e);
             }
         }
 

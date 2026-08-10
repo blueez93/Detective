@@ -17,6 +17,17 @@ sourceSets.main.resources {
     srcDir('src/generated/resources')
 }
 
+sourceSets {
+    validation {
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += output + compileClasspath
+    }
+    test {
+        compileClasspath += sourceSets.validation.output
+        runtimeClasspath += sourceSets.validation.output
+    }
+}
+
 repositories {
 }
 
@@ -31,11 +42,31 @@ runs {
         systemProperty 'forge.logging.markers', 'REGISTRIES'
         systemProperty 'forge.logging.console.level', 'debug'
         workingDirectory project.layout.projectDirectory.dir('run').dir(name)
-        modSource project.sourceSets.main
     }
 
     client {
+        modSource project.sourceSets.main
         systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        systemProperty 'detective.validation.enabled', 'true'
+        def validationWorld = providers.gradleProperty('detectiveValidationWorld').orNull
+        def validationServer = providers.gradleProperty('detectiveValidationServer').orNull
+        def validationAutorun = providers.gradleProperty('detectiveValidationAutorun').orNull
+        def validationExit = providers.gradleProperty('detectiveValidationExit').orNull
+        if (validationWorld != null) {
+            arguments.addAll '--quickPlaySingleplayer', validationWorld
+        }
+        if (validationServer != null) {
+            systemProperty 'detective.validation.autoconnectServer', validationServer
+        }
+        if (validationAutorun != null) {
+            systemProperty 'detective.validation.autorun', validationAutorun
+        }
+        if (validationExit != null) {
+            systemProperty 'detective.validation.exitAfterAutorun', validationExit
+        }
+        modSources {
+            add('detective_testculprit', project.sourceSets.validation)
+        }
     }
 
     server {
@@ -48,12 +79,15 @@ runs {
     }
 
     data {
+        modSource project.sourceSets.main
         arguments.addAll '--mod', project.mod_id, '--all', '--output', file('src/generated/resources/').getAbsolutePath(), '--existing', file('src/main/resources/').getAbsolutePath()
     }
 }
 
 configurations {
     runtimeClasspath.extendsFrom localRuntime
+    validationImplementation.extendsFrom implementation
+    validationRuntimeOnly.extendsFrom runtimeOnly
 }
 
 dependencies {
@@ -87,4 +121,12 @@ tasks.withType(JavaCompile).configureEach {
 
 tasks.withType(Test).configureEach {
     useJUnitPlatform()
+}
+
+tasks.named('compileTestJava').configure {
+    dependsOn tasks.named('validationClasses')
+}
+
+tasks.named('check').configure {
+    dependsOn tasks.named('validationClasses')
 }

@@ -2,5 +2,7 @@
 build/
 out/
 run/
+/run*.stdout.log
+/run*.stderr.log
 .idea/
 *.iml
