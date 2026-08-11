@@ -1,4 +1,4 @@
-# Detective — v0.4 First Usable UI
+# Detective — v0.4.1 Investigation UI Polish
 
 Minecraft 1.21.1 / NeoForge 21.1.235 / Java 21.
 

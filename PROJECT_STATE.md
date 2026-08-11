@@ -5,8 +5,8 @@
 
 Detective should turn technical profiling evidence into a clear, cautious investigation for normal Minecraft players and modpack maintainers. Detective finds the evidence; the player makes the call.
 
-## v0.4 scope — First usable client UI
-A lightweight, vanilla-friendly client interface over the validated v0.3.1 engine. It exposes persisted incidents, cautious evidence states, Black Box history, and launch-to-launch modpack changes without changing the production attribution algorithm.
+## v0.4.1 scope — Investigation UI polish
+A lightweight, vanilla-friendly client interface over the validated v0.3.1 engine. It exposes persisted incidents, cautious evidence states, Black Box history, and launch-to-launch modpack changes without changing the production attribution algorithm. Product copy follows: “Detect. Measure. Explain. Never accuse.”
 
 ### Production subsystems
 - Snapshot: pack state and version changes.

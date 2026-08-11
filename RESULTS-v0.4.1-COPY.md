@@ -144,9 +144,9 @@ No important text was shortened to alternate wording. Long detail content is exp
 
 ## 13. Public JAR contents
 
-Artifact: `build/libs/detective-0.4.0-alpha.1.jar`
+Artifact: `build/libs/detective-0.4.1-alpha.1.jar`
 
-- SHA-256: `2ED1FECE7C666D932A2E22439E3BAE842CE031D79E5C30ACC33038D18CDE9BE1`
+- SHA-256: `7C95F0B89393AA5852CA57D4CBBB5E3EA817D8F8BC26E02483618163DC60D24D`
 - 87 entries, including 69 class files.
 - Every class is under `fr/apocalypsebleu/moddetective`.
 - Only the expected top-level paths are present: `META-INF`, `assets`, and `fr`.
@@ -160,6 +160,6 @@ None. Ranking, evidence classification, watchdog, Black Box recording, incident 
 ## 15. Remaining issues before v0.4.1 final
 
 - Perform one manual interactive pass outside the constrained Codex controller: click every navigation entry, the `View Technical Evidence` action, both technical tooltips, and resize/change GUI scale while scrolling.
-- The build metadata intentionally remains `0.4.0-alpha.1`; update the Gradle version and release notes only when the v0.4.1 final milestone is explicitly frozen.
+- The publication artifact and embedded NeoForge metadata are aligned on `0.4.1-alpha.1`.
 - The list context line still uses exact time/dimension/coordinates on one line. It fits the validated scale, but exceptionally long custom dimension names can still be width-trimmed.
 - Only `en_us` and `fr_fr` are provided at this milestone.
