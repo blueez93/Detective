@@ -66,6 +66,11 @@ runs {
     }
 
     client {
+        def validationProfile = providers.gradleProperty('detectiveValidationProfile').orNull
+        if (validationProfile != null) {
+            workingDirectory project.layout.projectDirectory.dir('run').dir('coverage').dir("${validationProfile}-client")
+            systemProperty 'detective.validation.profile', validationProfile
+        }
         modSource project.sourceSets.main
         systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
         systemProperty 'detective.validation.enabled', 'true'
@@ -77,6 +82,13 @@ runs {
         def validationGcLogging = providers.gradleProperty('detectiveValidationGcLogging').orNull
         def validationGcPressureMiB = providers.gradleProperty('detectiveValidationGcPressureMiB').orNull
         def validationGcPasses = providers.gradleProperty('detectiveValidationGcPasses').orNull
+        def validationMaxHeap = providers.gradleProperty('detectiveValidationMaxHeap').orNull
+        def validationInitialHeap = providers.gradleProperty('detectiveValidationInitialHeap').orNull
+        def validationWidth = providers.gradleProperty('detectiveValidationWidth').orNull
+        def validationHeight = providers.gradleProperty('detectiveValidationHeight').orNull
+        def validationFpsLimit = providers.gradleProperty('detectiveValidationFpsLimit').orNull
+        def validationVsync = providers.gradleProperty('detectiveValidationVsync').orNull
+        def validationModdedDimension = providers.gradleProperty('detectiveValidationModdedDimension').orNull
         if (validationWorld != null) {
             arguments.addAll '--quickPlaySingleplayer', validationWorld
         }
@@ -98,6 +110,27 @@ runs {
         if (validationGcPasses != null) {
             systemProperty 'detective.validation.gcPasses', validationGcPasses
         }
+        if (validationMaxHeap != null) {
+            jvmArgument "-Xmx${validationMaxHeap}"
+        }
+        if (validationInitialHeap != null) {
+            jvmArgument "-Xms${validationInitialHeap}"
+        }
+        if (validationWidth != null) {
+            arguments.addAll '--width', validationWidth
+        }
+        if (validationHeight != null) {
+            arguments.addAll '--height', validationHeight
+        }
+        if (validationFpsLimit != null) {
+            systemProperty 'detective.validation.fpsLimit', validationFpsLimit
+        }
+        if (validationVsync != null) {
+            systemProperty 'detective.validation.vsync', validationVsync
+        }
+        if (validationModdedDimension != null) {
+            systemProperty 'detective.validation.moddedDimension', validationModdedDimension
+        }
         if (validationGcLogging != null && validationGcLogging.toBoolean()) {
             systemProperty 'detective.validation.gcLogging', 'true'
             jvmArgument '-Xlog:gc*,safepoint:file=gc-validation.log:time,uptime,level,tags:filecount=1,filesize=20M'
@@ -110,6 +143,10 @@ runs {
     }
 
     server {
+        def validationProfile = providers.gradleProperty('detectiveValidationProfile').orNull
+        if (validationProfile != null) {
+            workingDirectory project.layout.projectDirectory.dir('run').dir('coverage').dir("${validationProfile}-server")
+        }
         // NeoGradle requires a mod source for a run, but the dedicated-server check must not
         // inject Detective. This deliberately empty source set supplies only the NeoForge SDK.
         modSource project.sourceSets.serverValidation
