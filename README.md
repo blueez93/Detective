@@ -1,3 +1,9 @@
+<p align="center">
+  <img src="docs/assets/branding/detective-icon-256.png"
+       alt="Detective"
+       width="160">
+</p>
+
 # DETECTIVE
 
 **Modpack diagnostics, without the guesswork.**
