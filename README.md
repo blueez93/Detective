@@ -1,7 +1,7 @@
 <p align="center">
-  <img src="docs/assets/branding/detective-icon-256.png"
-       alt="Detective"
-       width="160">
+  <img src="docs/assets/branding/detective-banner-v2.png"
+       alt="Detective banner"
+       width="100%">
 </p>
 
 # DETECTIVE
