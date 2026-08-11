@@ -12,6 +12,7 @@ import org.slf4j.Logger;
 public final class ModDetective {
     public static final String MOD_ID = "detective";
     public static final Logger LOGGER = LogUtils.getLogger();
+    public static final long SESSION_STARTED_AT_EPOCH_MS = System.currentTimeMillis();
 
     public ModDetective(IEventBus modEventBus) {
         modEventBus.addListener(this::onClientSetup);

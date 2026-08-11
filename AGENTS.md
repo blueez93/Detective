@@ -6,7 +6,7 @@ Detective is a client-side Minecraft diagnostic mod for Minecraft 1.21.1 using N
 The product goal is to help ordinary players identify which mod is probably responsible for freezes or performance regressions without requiring profiler expertise.
 
 ## Current milestone
-The current milestone is **v0.2 controlled engine validation**. Do not build the full UI yet.
+The current milestone is **v0.4 first usable client UI**. Preserve the validated v0.3.1 engine and keep the interface lightweight and vanilla-friendly.
 
 Preserve and make functional these subsystems:
 - mod/version snapshot and launch-to-launch diff
@@ -17,6 +17,7 @@ Preserve and make functional these subsystems:
 - ranked suspects for an incident
 - JSON incident reports
 - development-only controlled attribution harness
+- client-only incident, detail, Black Box, and modpack-change screens
 
 ## Engineering rules
 - Target Minecraft 1.21.1 and NeoForge 21.1.x.
@@ -27,7 +28,7 @@ Preserve and make functional these subsystems:
 - If an existing implementation is invalid for NeoForge 1.21.1, replace it with the closest robust implementation and document the change.
 - Suspect scores are evidence, not proof. Avoid naming a mod as definitively guilty unless causality is actually established.
 - Keep runtime overhead low. Profiling must not itself create visible stutter.
-- Avoid network calls and telemetry in v0.2.
+- Avoid network calls and telemetry in v0.4.
 - Do not add third-party runtime dependencies unless clearly justified.
 - Keep persistent output under the Detective data directory and avoid touching unrelated player files.
 - Keep all controlled-freeze and validation code outside the public `main` source set.
@@ -49,5 +50,5 @@ At the end of each substantial task, report:
 - remaining risks/TODOs
 - any NeoForge API assumptions that still need runtime validation
 
-## Scope guard for v0.2
-Do not implement dashboards, polished visual themes, cloud services, automatic uploads, monetization systems, or server-side profiling until the core detector is validated in-game.
+## Scope guard for v0.4
+Do not implement cloud services, automatic uploads, telemetry, monetization, Fabric support, public server profiling, 3D world localization, AI explanations, or a complex real-time overlay. Keep UI data adapters separate from the low-level engine.

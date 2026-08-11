@@ -72,7 +72,25 @@ public final class ValidationHarness {
             DetectiveTestCulprit.LOGGER.warn("[Detective Validation] Action queue is full or shutting down");
             return false;
         }
-        ACTIONS.schedule(() -> Minecraft.getInstance().execute(action), delayMs, TimeUnit.MILLISECONDS);
+        ACTIONS.schedule(() -> {
+            try {
+                Minecraft minecraft = Minecraft.getInstance();
+                if (minecraft == null) {
+                    throw new IllegalStateException("Minecraft client is not initialized yet");
+                }
+                minecraft.execute(() -> {
+                    try {
+                        action.run();
+                    } catch (Throwable error) {
+                        DetectiveTestCulprit.LOGGER.error(
+                                "[Detective Validation] Scheduled render-thread action failed", error);
+                    }
+                });
+            } catch (Throwable error) {
+                DetectiveTestCulprit.LOGGER.error(
+                        "[Detective Validation] Could not dispatch scheduled render-thread action", error);
+            }
+        }, delayMs, TimeUnit.MILLISECONDS);
         return true;
     }
 

@@ -5,8 +5,8 @@
 
 Detective should turn technical profiling evidence into a simple diagnosis for normal Minecraft players and modpack maintainers.
 
-## v0.3.1 scope — Revalidation and stack evidence study
-Engine revalidation in a representative NeoForge modpack, with leaf/depth evidence for nested stacks. No polished GUI yet.
+## v0.4 scope — First usable client UI
+A lightweight, vanilla-friendly client interface over the validated v0.3.1 engine. It exposes persisted incidents, cautious evidence states, Black Box history, and launch-to-launch modpack changes without changing the production attribution algorithm.
 
 ### Production subsystems
 - Snapshot: pack state and version changes.
@@ -16,6 +16,12 @@ Engine revalidation in a representative NeoForge modpack, with leaf/depth eviden
 - Suspect Analyzer: best-effort class -> mod attribution with presence, leaf ownership, depth, repetition, caller-only, and stack-diversity evidence.
 - Incident Store: atomic JSON evidence bundle under `<game directory>/detective`.
 - Attribution Evidence: explicit attributed/ambiguous/insufficient/GC/native-or-driver/unknown state without a fabricated culprit.
+- UI data layer: tolerant incident/modpack adapters, immutable view models, newest-first index, lazy detail loading, and a single low-priority bounded-lifecycle data worker.
+- Client UI: entry buttons on the title and pause screens, session summary, scrollable incident list, incident detail with a simple 2D Black Box graph, and modpack changes.
+
+### v0.3.1 engine baseline
+- The immutable v0.3 and v0.3.1 measurements remain in `validation-pack/RESULTS-v0.3.md` and `validation-pack/RESULTS-v0.3.1.md`.
+- Production ranking remains leaf-ownership-first with presence as preserved evidence/fallback. v0.4 adds display tiers only; it does not tune detection, attribution, debounce, or confidence states.
 
 ### Development-only validation
 - Three source sets loaded as separate `detective_testculprit_a`, `_b`, and `_c` mods by `runClient` only.
@@ -29,6 +35,7 @@ Engine revalidation in a representative NeoForge modpack, with leaf/depth eviden
 - Development-only GC pressure runs off the render thread and emits monotonic/epoch markers for correlation with optional unified JVM GC logs.
 - Phase incident JSON is analyzed on validation workers, not the render thread.
 - The public JAR contains only `sourceSets.main`.
+- A v0.4 screenshot route opens the real pause menu, home, real incident list/detail, modpack changes, a synthetic empty list, and the title entry. Accessibility onboarding and the experimental-world confirmation are handled only in this development route.
 
 ### v0.3.1 measured result
 - The immutable v0.3 baseline remains in `validation-pack/RESULTS-v0.3.md`.
@@ -39,16 +46,23 @@ Engine revalidation in a representative NeoForge modpack, with leaf/depth eviden
 - The soak exposed a harness phase-analysis stall and a focus-restore spillover. JSON phase analysis now runs on workers and three active frames are skipped after suspension. A focused post-fix runtime replay produced zero incidents across iconify, restore, recovery, and stable phases.
 - Detailed measurements, exclusions, and the UI recommendation are in `validation-pack/RESULTS-v0.3.1.md`.
 
+### v0.4 validation result
+- Minecraft 1.21.1 / NeoForge 21.1.235 loaded Detective 0.4.0-alpha.1 with the pinned realistic validation pack.
+- Both client-only menu entry buttons and all four screens rendered in an 854 × 480 client using persisted real incidents; the no-incident path was also rendered without mutating stored data.
+- Incident summaries are streamed without materializing their large Black Box arrays. Full JSON and peak-preserving graph downsampling are loaded once, off the render thread, only for the selected detail.
+- The final runtime route produced eight screenshots, including an attributed detail and its scrolled Black Box, and stopped the watchdog and integrated server cleanly. A chunk/world-entry stall before the route produced `INSUFFICIENT_EVIDENCE`; it is retained as an honest runtime observation rather than filtered for UI validation.
+- Detailed results are in `validation-pack/RESULTS-v0.4.md`.
+
 ## Compatibility note
 The public mod id and data directory changed from `moddetective` to `detective` in v0.2. Existing data is moved when possible; conflicts are retained in the legacy directory instead of being overwritten. The Java package remains `fr.apocalypsebleu.moddetective` to avoid a risky package-wide migration during engine validation.
 
-## Non-goals for v0.3.1
+## Non-goals for v0.4
 - Exact GPU profiling.
 - Server TPS profiling.
 - Automatic disabling of mods.
 - Claiming causal certainty.
 - Cloud uploads or telemetry.
-- Final dashboard UI.
+- Final visual polish, complex real-time overlay, or advanced export.
 
 ## Future differentiators
 - Compare regressions between launches.

@@ -110,6 +110,7 @@ public final class ValidationCommands {
             case "evidence" -> scheduleEvidenceStudy();
             case "gc" -> scheduleGcStudy();
             case "focus" -> scheduleFocusStudy();
+            case "ui" -> UiValidationPlan.start(true) || UiValidationPlan.isRunning();
             case "realworld" -> RealWorldValidationPlan.start();
             default -> false;
         };
@@ -123,6 +124,7 @@ public final class ValidationCommands {
                     case "evidence" -> 55_000L;
                     case "gc" -> 45_000L;
                     case "focus" -> 25_000L;
+                    case "ui" -> 27_000L;
                     default -> 12_000L;
                 };
                 schedule(() -> {

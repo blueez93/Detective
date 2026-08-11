@@ -8,6 +8,7 @@ import fr.apocalypsebleu.moddetective.core.EngineMetricsSnapshot;
 import fr.apocalypsebleu.moddetective.core.RenderThreadWatchdog;
 import fr.apocalypsebleu.moddetective.core.SuspectAnalyzer;
 import fr.apocalypsebleu.moddetective.core.SamplingContinuityGate;
+import fr.apocalypsebleu.moddetective.client.ui.data.DetectiveUiService;
 import net.minecraft.client.Minecraft;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -140,5 +141,6 @@ public final class ClientPerformanceEvents {
     public static void onGameShuttingDown(GameShuttingDownEvent event) {
         WATCHDOG.stop();
         FREEZE_DETECTOR.close();
+        DetectiveUiService.shutdown();
     }
 }

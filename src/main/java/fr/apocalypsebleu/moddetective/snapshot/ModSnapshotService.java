@@ -18,10 +18,12 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 public final class ModSnapshotService {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    private static final AtomicReference<ModSnapshotDiff> LATEST_DIFF = new AtomicReference<>();
 
     private ModSnapshotService() {}
 
@@ -38,7 +40,13 @@ public final class ModSnapshotService {
             ModDetective.LOGGER.error("[Detective] Unable to persist the mod snapshot", e);
         }
 
-        return ModSnapshotDiff.between(previous, current);
+        ModSnapshotDiff diff = ModSnapshotDiff.between(previous, current);
+        LATEST_DIFF.set(diff);
+        return diff;
+    }
+
+    public static ModSnapshotDiff latestDiff() {
+        return LATEST_DIFF.get();
     }
 
     public static ModSnapshot capture() {
