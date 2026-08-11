@@ -15,11 +15,26 @@ class SamplingContinuityGateTest {
     }
 
     @Test
-    void skipsSuspendedFramesAndFirstResumedFrame() {
+    void skipsSuspendedFramesAndThreeRestorationFrames() {
         SamplingContinuityGate gate = new SamplingContinuityGate();
 
         assertFalse(gate.shouldRecord(false));
         assertFalse(gate.shouldRecord(false));
+        assertFalse(gate.shouldRecord(true));
+        assertFalse(gate.shouldRecord(true));
+        assertFalse(gate.shouldRecord(true));
+        assertTrue(gate.shouldRecord(true));
+    }
+
+    @Test
+    void losingFocusAgainRestartsTheFullStabilizationWindow() {
+        SamplingContinuityGate gate = new SamplingContinuityGate();
+
+        assertFalse(gate.shouldRecord(false));
+        assertFalse(gate.shouldRecord(true));
+        assertFalse(gate.shouldRecord(false));
+        assertFalse(gate.shouldRecord(true));
+        assertFalse(gate.shouldRecord(true));
         assertFalse(gate.shouldRecord(true));
         assertTrue(gate.shouldRecord(true));
     }

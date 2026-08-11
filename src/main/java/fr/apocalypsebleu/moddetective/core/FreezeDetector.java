@@ -133,9 +133,10 @@ public final class FreezeDetector implements AutoCloseable {
             ModDetective.LOGGER.warn("[Detective] No probable mod attribution from {} watchdog samples (evidence state: {}).",
                     incident.watchdogSamples(), incident.attributionEvidence().state());
             for (SuspectAnalyzer.Suspect observation : incident.suspects()) {
-                ModDetective.LOGGER.warn("[Detective] Weak observation: {} ({}) appeared in {} samples ({}%); not enough evidence for attribution",
-                        observation.modName(), observation.modId(), observation.samplesObserved(),
-                        round(observation.sampleSharePercent()));
+                ModDetective.LOGGER.warn("[Detective] Observation: {} ({}) presence={}/{}% leaf={}/{}% averageDepth={}; confidence does not permit attribution",
+                        observation.modName(), observation.modId(), observation.presenceSamples(),
+                        round(observation.presenceSharePercent()), observation.leafOwnershipCount(),
+                        round(observation.leafOwnershipSharePercent()), round(observation.averageFirstFrameDepth()));
             }
             return;
         }
@@ -143,7 +144,7 @@ public final class FreezeDetector implements AutoCloseable {
         for (int i = 0; i < incident.suspects().size(); i++) {
             SuspectAnalyzer.Suspect suspect = incident.suspects().get(i);
             ModDetective.LOGGER.warn("[Detective] Suspect #{}: {} ({}) observed in {}% of freeze samples",
-                    i + 1, suspect.modName(), suspect.modId(), round(suspect.sampleSharePercent()));
+                    i + 1, suspect.modName(), suspect.modId(), round(suspect.presenceSharePercent()));
         }
     }
 

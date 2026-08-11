@@ -50,6 +50,44 @@ class SuspectAnalyzerTest {
     }
 
     @Test
+    void treatsIndexZeroAsTheActiveLeafDirectionAndCountsRepeatedOwnership() {
+        Map<String, ModSourceResolver.ResolvedMod> owners = Map.of(
+                "example.alpha.Caller", mod("alpha"),
+                "example.beta.Leaf", mod("beta"));
+        SuspectAnalyzer analyzer = new SuspectAnalyzer(className -> Optional.ofNullable(owners.get(className)));
+
+        SuspectAnalyzer.Analysis analysis = analyzer.analyze(List.of(
+                stack(1L, "java.util.concurrent.locks.LockSupport", "example.beta.Leaf", "example.alpha.Caller"),
+                stack(2L, "java.util.concurrent.locks.LockSupport", "example.beta.Leaf", "example.alpha.Caller")));
+
+        SuspectAnalyzer.Suspect beta = byId(analysis, "beta");
+        SuspectAnalyzer.Suspect alpha = byId(analysis, "alpha");
+        assertEquals(2, beta.leafOwnershipCount());
+        assertEquals(1, beta.minimumFirstFrameDepth());
+        assertEquals(1, beta.repeatedLeafOwnership());
+        assertEquals(0, alpha.leafOwnershipCount());
+        assertEquals(2, alpha.callerOnlySamples());
+        assertEquals(2.0, alpha.averageFirstFrameDepth());
+    }
+
+    @Test
+    void recordsDistinctOwnedStackShapesWithoutInflatingPresence() {
+        Map<String, ModSourceResolver.ResolvedMod> owners = Map.of(
+                "example.alpha.One", mod("alpha"),
+                "example.alpha.Two", mod("alpha"));
+        SuspectAnalyzer analyzer = new SuspectAnalyzer(className -> Optional.ofNullable(owners.get(className)));
+
+        SuspectAnalyzer.Analysis analysis = analyzer.analyze(List.of(
+                stack(1L, "example.alpha.One"),
+                stack(2L, "example.alpha.One"),
+                stack(3L, "example.alpha.Two")));
+
+        SuspectAnalyzer.Suspect alpha = byId(analysis, "alpha");
+        assertEquals(3, alpha.presenceSamples());
+        assertEquals(2, alpha.stackDiversity());
+    }
+
+    @Test
     void returnsEmptyAnalysisWithoutStackSamples() {
         SuspectAnalyzer analyzer = new SuspectAnalyzer(className -> Optional.of(mod("unexpected")));
 
@@ -62,6 +100,10 @@ class SuspectAnalyzerTest {
 
     private static ModSourceResolver.ResolvedMod mod(String id) {
         return new ModSourceResolver.ResolvedMod(id, id, "1.0");
+    }
+
+    private static SuspectAnalyzer.Suspect byId(SuspectAnalyzer.Analysis analysis, String id) {
+        return analysis.suspects().stream().filter(suspect -> id.equals(suspect.modId())).findFirst().orElseThrow();
     }
 
     private static StackSnapshot stack(long nanoTime, String... classes) {

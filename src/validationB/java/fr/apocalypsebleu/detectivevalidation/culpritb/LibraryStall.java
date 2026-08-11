@@ -19,4 +19,20 @@ public final class LibraryStall {
     public static void delegateToC(long durationMs) {
         StandardLibraryStall.block(durationMs);
     }
+
+    public static void delegateToAReflectively(long durationMs) {
+        invokeStaticBlock("fr.apocalypsebleu.detectivevalidation.culprita.DirectStall", "block", durationMs);
+    }
+
+    public static void delegateToCThenA(long durationMs) {
+        StandardLibraryStall.delegateToAReflectively(durationMs);
+    }
+
+    private static void invokeStaticBlock(String className, String methodName, long durationMs) {
+        try {
+            Class.forName(className).getMethod(methodName, long.class).invoke(null, durationMs);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Development validation bridge failed", e);
+        }
+    }
 }

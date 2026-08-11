@@ -71,6 +71,9 @@ runs {
         def validationAutorun = providers.gradleProperty('detectiveValidationAutorun').orNull
         def validationExit = providers.gradleProperty('detectiveValidationExit').orNull
         def validationSoakMinutes = providers.gradleProperty('detectiveValidationSoakMinutes').orNull
+        def validationGcLogging = providers.gradleProperty('detectiveValidationGcLogging').orNull
+        def validationGcPressureMiB = providers.gradleProperty('detectiveValidationGcPressureMiB').orNull
+        def validationGcPasses = providers.gradleProperty('detectiveValidationGcPasses').orNull
         if (validationWorld != null) {
             arguments.addAll '--quickPlaySingleplayer', validationWorld
         }
@@ -85,6 +88,16 @@ runs {
         }
         if (validationSoakMinutes != null) {
             systemProperty 'detective.validation.soakMinutes', validationSoakMinutes
+        }
+        if (validationGcPressureMiB != null) {
+            systemProperty 'detective.validation.gcPressureMiB', validationGcPressureMiB
+        }
+        if (validationGcPasses != null) {
+            systemProperty 'detective.validation.gcPasses', validationGcPasses
+        }
+        if (validationGcLogging != null && validationGcLogging.toBoolean()) {
+            systemProperty 'detective.validation.gcLogging', 'true'
+            jvmArgument '-Xlog:gc*,safepoint:file=gc-validation.log:time,uptime,level,tags:filecount=1,filesize=20M'
         }
         modSources {
             add('detective_testculprit_a', project.sourceSets.validation)

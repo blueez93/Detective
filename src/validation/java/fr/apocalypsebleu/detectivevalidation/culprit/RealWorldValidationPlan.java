@@ -41,7 +41,7 @@ final class RealWorldValidationPlan {
         schedule(() -> Minecraft.getInstance().reloadResourcePacks(), fraction(totalMs, 0.59));
 
         phase("explicit_gc_pressure", false, fraction(totalMs, 0.66));
-        schedule(RealWorldValidationPlan::requestGcUnderPressure, fraction(totalMs, 0.67));
+        schedule(GcValidationScenario::start, fraction(totalMs, 0.67));
 
         phase("controlled_attribution", false, fraction(totalMs, 0.72));
         long attributionStart = fraction(totalMs, 0.73);
@@ -49,13 +49,21 @@ final class RealWorldValidationPlan {
         schedule(() -> ValidationCommands.runStall("realworld-direct-a", 600L, true,
                 ControlledFreezeGenerator.Path.DIRECT_A, 1), attributionStart);
         schedule(() -> ValidationCommands.runStall("realworld-direct-b", 600L, true,
-                ControlledFreezeGenerator.Path.DIRECT_B, 1), attributionStart + 3_500L);
+                ControlledFreezeGenerator.Path.DIRECT_B, 1), attributionStart + 5_000L);
         schedule(() -> ValidationCommands.runStall("realworld-scheduled-c", 600L, true,
-                ControlledFreezeGenerator.Path.SCHEDULED_STANDARD_C, 1), attributionStart + 7_000L);
+                ControlledFreezeGenerator.Path.SCHEDULED_STANDARD_C, 1), attributionStart + 10_000L);
         schedule(() -> ValidationCommands.runStall("realworld-indirect-b", 600L, true,
-                ControlledFreezeGenerator.Path.INDIRECT_A_TO_B, 3), attributionStart + 10_500L);
+                ControlledFreezeGenerator.Path.INDIRECT_A_TO_B, 3), attributionStart + 15_000L);
         schedule(() -> ValidationCommands.runStall("realworld-nested-c", 600L, true,
-                ControlledFreezeGenerator.Path.NESTED_A_TO_B_TO_C, 3), attributionStart + 14_000L);
+                ControlledFreezeGenerator.Path.NESTED_A_TO_B_TO_C, 3), attributionStart + 20_000L);
+        schedule(() -> ValidationCommands.runStall("realworld-a-to-c", 600L, true,
+                ControlledFreezeGenerator.Path.A_TO_C, 3), attributionStart + 25_000L);
+        schedule(() -> ValidationCommands.runStall("realworld-b-to-a", 600L, true,
+                ControlledFreezeGenerator.Path.B_TO_A, 3), attributionStart + 30_000L);
+        schedule(() -> ValidationCommands.runStall("realworld-c-to-b", 600L, true,
+                ControlledFreezeGenerator.Path.C_TO_B, 3), attributionStart + 35_000L);
+        schedule(() -> ValidationCommands.runStall("realworld-b-to-c-to-a", 600L, true,
+                ControlledFreezeGenerator.Path.B_TO_C_TO_A, 3), attributionStart + 40_000L);
 
         phase("pause_menu", true, fraction(totalMs, 0.82));
         schedule(() -> Minecraft.getInstance().setScreen(new PauseScreen(true)), fraction(totalMs, 0.825));
@@ -114,17 +122,6 @@ final class RealWorldValidationPlan {
         }
     }
 
-    private static void requestGcUnderPressure() {
-        byte[][] pressure = new byte[8][];
-        for (int index = 0; index < pressure.length; index++) {
-            pressure[index] = new byte[8 * 1024 * 1024];
-            pressure[index][0] = (byte) index;
-        }
-        DetectiveTestCulprit.LOGGER.info("[Detective Validation] Requesting explicit GC after 64 MiB temporary allocation");
-        pressure = null;
-        System.gc();
-    }
-
     private static void reconnect() {
         String server = System.getProperty("detective.validation.autoconnectServer", "").trim();
         if (server.isEmpty()) {
@@ -134,11 +131,11 @@ final class RealWorldValidationPlan {
         ValidationCommands.reconnectToConfiguredServer();
     }
 
-    private static void iconifyWindow() {
+    static void iconifyWindow() {
         GLFW.glfwIconifyWindow(Minecraft.getInstance().getWindow().getWindow());
     }
 
-    private static void restoreWindow() {
+    static void restoreWindow() {
         long window = Minecraft.getInstance().getWindow().getWindow();
         GLFW.glfwRestoreWindow(window);
         GLFW.glfwFocusWindow(window);

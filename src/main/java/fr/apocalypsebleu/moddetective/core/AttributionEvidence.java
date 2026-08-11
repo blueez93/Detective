@@ -9,6 +9,7 @@ public record AttributionEvidence(
 ) {
     public enum State {
         ATTRIBUTED,
+        AMBIGUOUS_ATTRIBUTION,
         INSUFFICIENT_EVIDENCE,
         JVM_GC_SUSPECTED,
         NATIVE_OR_DRIVER_STALL_POSSIBLE,

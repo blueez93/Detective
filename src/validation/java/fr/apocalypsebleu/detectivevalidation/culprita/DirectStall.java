@@ -1,5 +1,7 @@
 package fr.apocalypsebleu.detectivevalidation.culprita;
 
+import fr.apocalypsebleu.detectivevalidation.culpritc.StandardLibraryStall;
+
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.LockSupport;
 
@@ -12,5 +14,9 @@ public final class DirectStall {
         while ((remaining = deadline - System.nanoTime()) > 0L) {
             LockSupport.parkNanos(remaining);
         }
+    }
+
+    public static void delegateToC(long durationMs) {
+        StandardLibraryStall.block(durationMs);
     }
 }

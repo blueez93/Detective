@@ -4,6 +4,8 @@ import com.google.gson.Gson;
 import com.google.gson.JsonParseException;
 import fr.apocalypsebleu.moddetective.client.ClientPerformanceEvents;
 import fr.apocalypsebleu.moddetective.core.EngineMetricsSnapshot;
+import fr.apocalypsebleu.moddetective.core.SuspectAnalyzer;
+import fr.apocalypsebleu.moddetective.core.SuspectRankingModels;
 import fr.apocalypsebleu.moddetective.storage.ModDetectivePaths;
 import net.minecraft.client.Minecraft;
 import net.neoforged.fml.loading.FMLPaths;
@@ -115,15 +117,18 @@ public final class ValidationHarness {
 
     public static void beginPhase(String phase, boolean falsePositiveEligible) {
         Objects.requireNonNull(phase, "phase");
+        long boundaryEpochMs = System.currentTimeMillis();
+        long boundaryNanos = System.nanoTime();
+        Set<Path> reportsAtBoundary = captureExistingReports();
         PhaseObservation next = new PhaseObservation(
                 phase,
                 falsePositiveEligible,
-                System.currentTimeMillis(),
-                System.nanoTime(),
-                captureExistingReports().size());
+                boundaryEpochMs,
+                boundaryNanos,
+                reportsAtBoundary);
         PhaseObservation previous = CURRENT_PHASE.getAndSet(next);
         if (previous != null) {
-            finishPhase(previous);
+            finishPhaseAsync(previous, boundaryEpochMs, boundaryNanos, reportsAtBoundary);
         }
         DetectiveTestCulprit.LOGGER.info("[Detective Validation] PHASE {} started (falsePositiveEligible={})",
                 phase, falsePositiveEligible);
@@ -132,9 +137,12 @@ public final class ValidationHarness {
     public static void shutdown() {
         PhaseObservation phase = CURRENT_PHASE.getAndSet(null);
         if (phase != null) {
-            finishPhase(phase);
+            long boundaryEpochMs = System.currentTimeMillis();
+            long boundaryNanos = System.nanoTime();
+            finishPhaseAsync(phase, boundaryEpochMs, boundaryNanos, captureExistingReports());
         }
         logAccuracy();
+        GcValidationScenario.shutdown();
         ACTIONS.shutdownNow();
         VALIDATOR.shutdown();
         try {
@@ -198,6 +206,7 @@ public final class ValidationHarness {
                     incident.frame() == null ? null : incident.frame().playerX(),
                     incident.frame() == null ? null : incident.frame().playerY(),
                     incident.frame() == null ? null : incident.frame().playerZ());
+            logAndPersistStackEvidence(truth, incident);
         }
         logMetricsSafely();
         logAccuracy();
@@ -262,8 +271,8 @@ public final class ValidationHarness {
     private static ValidationResultEvaluator.Detected toDetected(IncidentJson incident) {
         List<ValidationResultEvaluator.Suspect> suspects = new ArrayList<>();
         if (incident.suspects() != null) {
-            for (SuspectJson suspect : incident.suspects()) {
-                suspects.add(new ValidationResultEvaluator.Suspect(suspect.modId(), suspect.sampleSharePercent()));
+            for (SuspectAnalyzer.Suspect suspect : incident.suspects()) {
+                suspects.add(new ValidationResultEvaluator.Suspect(suspect.modId(), suspect.presenceSharePercent()));
             }
         }
         FrameJson frame = incident.frame();
@@ -280,6 +289,79 @@ public final class ValidationHarness {
                 incident.blackBox() == null ? 0 : incident.blackBox().size(),
                 hasWorldLocation,
                 suspects);
+    }
+
+    private static void logAndPersistStackEvidence(
+            ControlledFreezeGenerator.GroundTruth truth,
+            IncidentJson incident
+    ) {
+        List<SuspectAnalyzer.Suspect> suspects = incident.suspects() == null ? List.of() : incident.suspects();
+        List<SuspectAnalyzer.Suspect> presence = SuspectRankingModels.rank(
+                suspects, SuspectRankingModels.Model.PRESENCE);
+        List<SuspectAnalyzer.Suspect> leaf = SuspectRankingModels.rank(
+                suspects, SuspectRankingModels.Model.LEAF_OWNERSHIP);
+        List<SuspectAnalyzer.Suspect> combined = SuspectRankingModels.rank(
+                suspects, SuspectRankingModels.Model.PRESENCE_THEN_LEAF);
+        List<SuspectAnalyzer.Suspect> depth = SuspectRankingModels.rank(
+                suspects, SuspectRankingModels.Model.DEPTH);
+        List<SuspectAnalyzer.Suspect> production = SuspectRankingModels.rank(
+                suspects, SuspectAnalyzer.PRODUCTION_RANKING_MODEL);
+
+        List<StackEvidenceRow> rows = suspects.stream()
+                .map(suspect -> new StackEvidenceRow(
+                        suspect.modId(),
+                        rankOf(suspect.modId(), presence),
+                        suspect.presenceSamples(),
+                        suspect.presenceSharePercent(),
+                        rankOf(suspect.modId(), leaf),
+                        suspect.leafOwnershipCount(),
+                        suspect.leafOwnershipSharePercent(),
+                        rankOf(suspect.modId(), combined),
+                        rankOf(suspect.modId(), depth),
+                        suspect.averageFirstFrameDepth(),
+                        suspect.minimumFirstFrameDepth(),
+                        suspect.repeatedLeafOwnership(),
+                        suspect.callerOnlySamples(),
+                        suspect.stackDiversity(),
+                        rankOf(suspect.modId(), production)))
+                .toList();
+
+        StackEvidenceResult evidence = new StackEvidenceResult(
+                truth.scenarioId(),
+                truth.path(),
+                truth.expectedModId(),
+                SuspectAnalyzer.PRODUCTION_RANKING_MODEL.name(),
+                rankOf(truth.expectedModId(), presence),
+                rankOf(truth.expectedModId(), leaf),
+                rankOf(truth.expectedModId(), combined),
+                rankOf(truth.expectedModId(), depth),
+                rankOf(truth.expectedModId(), production),
+                incident.attributionEvidence() == null ? "<missing>" : incident.attributionEvidence().state(),
+                rows);
+        appendJsonLine(stackEvidenceFile(), evidence);
+
+        DetectiveTestCulprit.LOGGER.info(
+                "[Detective Validation] STACK_EVIDENCE scenario={} expected={} presenceRank={} leafRank={} presenceThenLeafRank={} depthRank={} finalModel={} finalRank={} evidenceState={}",
+                evidence.scenarioId(), evidence.expectedModId(), evidence.expectedPresenceRank(),
+                evidence.expectedLeafRank(), evidence.expectedPresenceThenLeafRank(), evidence.expectedDepthRank(),
+                evidence.productionRankingModel(), evidence.expectedFinalRank(), evidence.attributionEvidenceState());
+        for (StackEvidenceRow row : rows) {
+            DetectiveTestCulprit.LOGGER.info(
+                    "[Detective Validation] STACK_EVIDENCE_ROW mod={} presenceRank={} presence={}/{}% leafRank={} leaf={}/{}% avgDepth={} minDepth={} repeatedLeaf={} callerOnly={} diversity={} finalRank={}",
+                    row.modId(), row.presenceRank(), row.presenceSamples(), round(row.presenceSharePercent()),
+                    row.leafRank(), row.leafOwnershipCount(), round(row.leafOwnershipSharePercent()),
+                    round(row.averageFirstFrameDepth()), row.minimumFirstFrameDepth(),
+                    row.repeatedLeafOwnership(), row.callerOnlySamples(), row.stackDiversity(), row.finalRank());
+        }
+    }
+
+    private static int rankOf(String modId, List<SuspectAnalyzer.Suspect> suspects) {
+        for (int index = 0; index < suspects.size(); index++) {
+            if (modId.equals(suspects.get(index).modId())) {
+                return index + 1;
+            }
+        }
+        return 0;
     }
 
     private static void appendGroundTruth(GroundTruthLine line) {
@@ -358,22 +440,81 @@ public final class ValidationHarness {
         return phase == null ? "startup" : phase.name();
     }
 
-    private static void finishPhase(PhaseObservation phase) {
-        int incidentDelta = Math.max(0, captureExistingReports().size() - phase.incidentsAtStart());
+    private static void finishPhaseAsync(
+            PhaseObservation phase,
+            long endedEpochMs,
+            long endedNanos,
+            Set<Path> reportsAtEnd
+    ) {
+        try {
+            VALIDATOR.execute(() -> finishPhase(
+                    phase, endedEpochMs, endedNanos, Set.copyOf(reportsAtEnd)));
+        } catch (RejectedExecutionException e) {
+            DetectiveTestCulprit.LOGGER.error(
+                    "[Detective Validation] Phase analysis queue is full; result dropped", e);
+        }
+    }
+
+    private static void finishPhase(
+            PhaseObservation phase,
+            long endedEpochMs,
+            long endedNanos,
+            Set<Path> reportsAtEnd
+    ) {
+        Set<Path> newReports = new HashSet<>(reportsAtEnd);
+        newReports.removeAll(phase.reportsAtStart());
+        EvidenceCounts counts = countEvidence(newReports);
+        int incidentDelta = newReports.size();
         PhaseResult result = new PhaseResult(
                 phase.name(),
                 phase.falsePositiveEligible(),
                 phase.startedEpochMs(),
-                System.currentTimeMillis(),
-                Math.max(0L, System.nanoTime() - phase.startedNanos()),
-                incidentDelta);
+                endedEpochMs,
+                Math.max(0L, endedNanos - phase.startedNanos()),
+                incidentDelta,
+                counts.attributed(),
+                counts.insufficient(),
+                counts.ambiguous(),
+                counts.jvmGc(),
+                counts.nativeDriver(),
+                counts.unknown(),
+                phase.falsePositiveEligible() ? incidentDelta : 0,
+                0);
         appendJsonLine(phaseFile(), result);
         DetectiveTestCulprit.LOGGER.info(
-                "[Detective Validation] PHASE_RESULT phase={} durationMs={} incidents={} falsePositiveIncidents={}",
+                "[Detective Validation] PHASE_RESULT phase={} durationMs={} incidents={} negativePhaseIncidents={} confirmedFalsePositives={}",
                 result.name(),
                 round(result.durationNanos() / 1_000_000.0),
                 result.incidentsCreated(),
-                result.falsePositiveEligible() ? result.incidentsCreated() : 0);
+                result.negativePhaseIncidents(),
+                result.confirmedFalsePositives());
+    }
+
+    private static EvidenceCounts countEvidence(Set<Path> reports) {
+        int attributed = 0;
+        int insufficient = 0;
+        int ambiguous = 0;
+        int jvmGc = 0;
+        int nativeDriver = 0;
+        int unknown = 0;
+        for (Path report : reports) {
+            try {
+                IncidentJson incident = GSON.fromJson(Files.readString(report, StandardCharsets.UTF_8), IncidentJson.class);
+                String state = incident == null || incident.attributionEvidence() == null
+                        ? "UNKNOWN" : incident.attributionEvidence().state();
+                switch (state) {
+                    case "ATTRIBUTED" -> attributed++;
+                    case "INSUFFICIENT_EVIDENCE" -> insufficient++;
+                    case "AMBIGUOUS_ATTRIBUTION" -> ambiguous++;
+                    case "JVM_GC_SUSPECTED" -> jvmGc++;
+                    case "NATIVE_OR_DRIVER_STALL_POSSIBLE" -> nativeDriver++;
+                    default -> unknown++;
+                }
+            } catch (IOException | JsonParseException e) {
+                unknown++;
+            }
+        }
+        return new EvidenceCounts(attributed, insufficient, ambiguous, jvmGc, nativeDriver, unknown);
     }
 
     private static void logAccuracy() {
@@ -391,6 +532,10 @@ public final class ValidationHarness {
 
     private static Path phaseFile() {
         return validationDirectory().resolve("phase-results.jsonl");
+    }
+
+    private static Path stackEvidenceFile() {
+        return validationDirectory().resolve("stack-evidence-results.jsonl");
     }
 
     private static Path validationDirectory() {
@@ -444,13 +589,12 @@ public final class ValidationHarness {
             FrameJson frame,
             int watchdogSamples,
             AttributionEvidenceJson attributionEvidence,
-            List<SuspectJson> suspects,
+            List<SuspectAnalyzer.Suspect> suspects,
             List<Object> blackBox
     ) {}
 
     private record FrameJson(String dimension, Integer playerX, Integer playerY, Integer playerZ) {}
 
-    private record SuspectJson(String modId, double sampleSharePercent) {}
     private record AttributionEvidenceJson(String state) {}
     private record MetricLine(
             long epochMs,
@@ -465,7 +609,7 @@ public final class ValidationHarness {
             boolean falsePositiveEligible,
             long startedEpochMs,
             long startedNanos,
-            int incidentsAtStart
+            Set<Path> reportsAtStart
     ) {}
     private record PhaseResult(
             String name,
@@ -473,6 +617,52 @@ public final class ValidationHarness {
             long startedEpochMs,
             long endedEpochMs,
             long durationNanos,
-            int incidentsCreated
+            int incidentsCreated,
+            int attributedIncidents,
+            int insufficientEvidenceIncidents,
+            int ambiguousIncidents,
+            int jvmGcSuspectedIncidents,
+            int nativeDriverPossibleIncidents,
+            int unknownIncidents,
+            int negativePhaseIncidents,
+            int confirmedFalsePositives
+    ) {}
+    private record EvidenceCounts(
+            int attributed,
+            int insufficient,
+            int ambiguous,
+            int jvmGc,
+            int nativeDriver,
+            int unknown
+    ) {}
+    private record StackEvidenceResult(
+            String scenarioId,
+            String path,
+            String expectedModId,
+            String productionRankingModel,
+            int expectedPresenceRank,
+            int expectedLeafRank,
+            int expectedPresenceThenLeafRank,
+            int expectedDepthRank,
+            int expectedFinalRank,
+            String attributionEvidenceState,
+            List<StackEvidenceRow> suspects
+    ) {}
+    private record StackEvidenceRow(
+            String modId,
+            int presenceRank,
+            int presenceSamples,
+            double presenceSharePercent,
+            int leafRank,
+            int leafOwnershipCount,
+            double leafOwnershipSharePercent,
+            int presenceThenLeafRank,
+            int depthRank,
+            double averageFirstFrameDepth,
+            int minimumFirstFrameDepth,
+            int repeatedLeafOwnership,
+            int callerOnlySamples,
+            int stackDiversity,
+            int finalRank
     ) {}
 }

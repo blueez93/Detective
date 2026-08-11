@@ -13,4 +13,20 @@ public final class StandardLibraryStall {
             LockSupport.parkNanos(remaining);
         }
     }
+
+    public static void delegateToBReflectively(long durationMs) {
+        invokeStaticBlock("fr.apocalypsebleu.detectivevalidation.culpritb.LibraryStall", "block", durationMs);
+    }
+
+    public static void delegateToAReflectively(long durationMs) {
+        invokeStaticBlock("fr.apocalypsebleu.detectivevalidation.culprita.DirectStall", "block", durationMs);
+    }
+
+    private static void invokeStaticBlock(String className, String methodName, long durationMs) {
+        try {
+            Class.forName(className).getMethod(methodName, long.class).invoke(null, durationMs);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Development validation bridge failed", e);
+        }
+    }
 }

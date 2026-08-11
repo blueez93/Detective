@@ -1,4 +1,4 @@
-# Detective — v0.3 Real World Validation
+# Detective — v0.3.1 Revalidation and Stack Evidence Study
 
 Minecraft 1.21.1 / NeoForge 21.1.235 / Java 21.
 
@@ -11,12 +11,13 @@ Detective is a client-only diagnostic mod that records evidence around render-th
 - Samples the render thread every 20 ms from an independent low-priority watchdog.
 - Detects freezes at `max(120 ms, 6 × rolling median frame time)` after a warm-up baseline.
 - Resolves Java classes and JAR/package ownership through NeoForge metadata.
-- Ranks up to five suspects by their share of watchdog samples.
-- Stores an explicit attribution-evidence state (`ATTRIBUTED`, `INSUFFICIENT_EVIDENCE`, `JVM_GC_SUSPECTED`, `NATIVE_OR_DRIVER_STALL_POSSIBLE`, or `UNKNOWN`) instead of inventing a suspect when stacks are not attributable. `ATTRIBUTED` requires at least three observations of the strongest candidate and at least 40% of captured samples.
+- Collects presence, leaf ownership, first-frame depth, repeated leaf ownership, caller-only observations, and stack diversity for up to five suspects.
+- Ranks probable suspects by ownership of the first modded frame nearest the active execution point. Presence share remains preserved as evidence and as a deterministic fallback, but no ground truth enters the ranker.
+- Stores an explicit attribution-evidence state (`ATTRIBUTED`, `AMBIGUOUS_ATTRIBUTION`, `INSUFFICIENT_EVIDENCE`, `JVM_GC_SUSPECTED`, `NATIVE_OR_DRIVER_STALL_POSSIBLE`, or `UNKNOWN`) instead of inventing a suspect when stacks are not attributable. Ranking and confidence are independent.
 - Processes incidents on a bounded worker queue and atomically stores JSON under `<game directory>/detective/incidents/`.
 - Performs no network calls or telemetry and is not required on a server.
 
-The internal Java package remains `fr.apocalypsebleu.moddetective` for v0.3 to avoid a high-risk package-only rename. The public mod id, artifact, display name, assets, logs, and data directory are all `detective`/`Detective`.
+The internal Java package remains `fr.apocalypsebleu.moddetective` for v0.3.1 to avoid a high-risk package-only rename. The public mod id, artifact, display name, assets, logs, and data directory are all `detective`/`Detective`.
 
 ## Legacy data migration
 
@@ -47,6 +48,8 @@ With a world loaded, these local client commands are available:
 /detective_validate scheduled_c
 /detective_validate indirect_b
 /detective_validate nested_c
+/detective_validate evidence
+/detective_validate focus
 /detective_validate metrics
 ```
 
@@ -54,7 +57,7 @@ With a world loaded, these local client commands are available:
 
 Ground truth is written separately to `run/client/detective-validation/ground-truth.jsonl`. A validation worker reads newly produced incident JSON and logs `Expected`, `Detected #1`, rank, sample share, Top-1/Top-3, completeness, and `PASS`/`FAIL`. Ground truth is never passed to Detective's detection or attribution code.
 
-Development metrics are appended every five seconds to `overhead-metrics.jsonl`, including samples/second, average/p50/p95/p99/max capture cost, bounded-buffer sizes, worker queue state, dropped incidents, JVM heap, and a labelled retained-memory estimate. Phase results and false-positive counts are stored in `phase-results.jsonl`.
+Development metrics are appended every five seconds to `overhead-metrics.jsonl`, including samples/second, average/p50/p95/p99/max capture cost, bounded-buffer sizes, worker queue state, dropped incidents, JVM heap, and a labelled retained-memory estimate. Stack evidence is stored in `stack-evidence-results.jsonl`. Phase results distinguish negative-phase incident candidates from manually confirmed false positives.
 
 ## Realistic validation pack
 
@@ -66,7 +69,7 @@ Development metrics are appended every five seconds to `overhead-metrics.jsonl`,
 ```
 
 See `validation-pack/README.md` for exact versions, licenses, selection rationale, and the 30-minute validation procedure.
-Measured v0.3 results, false positives, attribution accuracy, and the proposed overhead budget are recorded in `validation-pack/RESULTS-v0.3.md`.
+The immutable v0.3 baseline is in `validation-pack/RESULTS-v0.3.md`; v0.3.1 comparisons, GC correlation, stack evidence, and limitations are in `validation-pack/RESULTS-v0.3.1.md`.
 
 ## Build and test
 
@@ -96,6 +99,8 @@ It waits for a loaded world and at least 60 Black Box frames, then covers stable
 
 The focused multi-culprit matrix can be repeated independently with `-PdetectiveValidationAutorun=attribution` and `-PdetectiveValidationExit=true`.
 
+The nine-shape stack study uses `-PdetectiveValidationAutorun=evidence`; the isolated focus continuity replay uses `-PdetectiveValidationAutorun=focus`. Add `-PdetectiveValidationGcLogging=true` to a GC or real-world run to create a local unified JVM log, and optionally tune `detectiveValidationGcPressureMiB` and `detectiveValidationGcPasses`. These settings and all pressure code remain development-only.
+
 The build compiles the validation source set so harness API breakage is caught, but the public JAR task packages only `sourceSets.main`.
 
 During a development run, inspect:
@@ -105,8 +110,10 @@ During a development run, inspect:
 - `run/client/detective/incidents/*.json`;
 - `run/client/detective-validation/ground-truth.jsonl`.
 - `run/client/detective-validation/overhead-metrics.jsonl`;
-- `run/client/detective-validation/phase-results.jsonl`.
+- `run/client/detective-validation/phase-results.jsonl`;
+- `run/client/detective-validation/stack-evidence-results.jsonl`;
+- `run/client/detective-validation/gc-markers.jsonl` and `run/client/gc-validation.log` when GC logging is enabled.
 
 ## Scope
 
-v0.3 validates the engine in a realistic modpack. It deliberately excludes the final dashboard, graphics work, cloud uploads, telemetry, server profiling, Fabric support, monetization, update services, and natural-language diagnosis.
+v0.3.1 validates stack evidence and engine continuity in a realistic modpack. It deliberately excludes the final dashboard, graphics work, cloud uploads, telemetry, server profiling, Fabric support, monetization, update services, and natural-language diagnosis.

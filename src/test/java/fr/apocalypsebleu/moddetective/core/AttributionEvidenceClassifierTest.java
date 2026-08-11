@@ -56,6 +56,23 @@ class AttributionEvidenceClassifierTest {
     }
 
     @Test
+    void reportsAmbiguousAttributionSeparatelyFromRanking() {
+        SuspectAnalyzer.Suspect alpha = new SuspectAnalyzer.Suspect(
+                "alpha", "Alpha", "1", 49, 49.0, 20, 20.0, 2.0, 2, 19, 29, 1);
+        SuspectAnalyzer.Suspect beta = new SuspectAnalyzer.Suspect(
+                "beta", "Beta", "1", 48, 48.0, 19, 19.0, 2.5, 2, 18, 29, 1);
+        List<StackSnapshot> stacks = List.of(
+                stack("example.Work1", "run", false),
+                stack("example.Work2", "run", false),
+                stack("example.Work3", "run", false));
+
+        AttributionEvidence evidence = AttributionEvidenceClassifier.classify(
+                stacks, new SuspectAnalyzer.Analysis(100, List.of(alpha, beta), List.of()));
+
+        assertEquals(AttributionEvidence.State.AMBIGUOUS_ATTRIBUTION, evidence.state());
+    }
+
+    @Test
     void reportsGcOnlyWhenAnExplicitGcMarkerExistsWithoutAModSuspect() {
         List<StackSnapshot> stacks = List.of(stack("java.lang.System", "gc", true));
 

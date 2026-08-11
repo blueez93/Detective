@@ -94,6 +94,30 @@ public final class ControlledFreezeGenerator {
             void block(long durationMs) {
                 callLibraryBThenC(durationMs);
             }
+        },
+        A_TO_C(DetectiveTestCulpritC.MOD_ID) {
+            @Override
+            void block(long durationMs) {
+                DirectStall.delegateToC(durationMs);
+            }
+        },
+        B_TO_A(DetectiveTestCulpritA.MOD_ID) {
+            @Override
+            void block(long durationMs) {
+                LibraryStall.delegateToAReflectively(durationMs);
+            }
+        },
+        C_TO_B(DetectiveTestCulpritB.MOD_ID) {
+            @Override
+            void block(long durationMs) {
+                StandardLibraryStall.delegateToBReflectively(durationMs);
+            }
+        },
+        B_TO_C_TO_A(DetectiveTestCulpritA.MOD_ID) {
+            @Override
+            void block(long durationMs) {
+                LibraryStall.delegateToCThenA(durationMs);
+            }
         };
 
         private final String expectedModId;

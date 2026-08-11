@@ -62,6 +62,8 @@ public final class ValidationCommands {
                         context, "indirect-a-b", 600L, ControlledFreezeGenerator.Path.INDIRECT_A_TO_B, 3)))
                 .then(Commands.literal("nested_c").executes(context -> runPath(
                         context, "nested-a-b-c", 600L, ControlledFreezeGenerator.Path.NESTED_A_TO_B_TO_C, 3)))
+                .then(Commands.literal("evidence").executes(ValidationCommands::runEvidenceStudy))
+                .then(Commands.literal("focus").executes(ValidationCommands::runFocusStudy))
                 .then(Commands.literal("metrics").executes(ValidationCommands::logMetrics)));
     }
 
@@ -105,6 +107,9 @@ public final class ValidationCommands {
             case "double" -> scheduleDouble();
             case "menus" -> scheduleLifecycleChecks();
             case "attribution" -> scheduleAttributionMatrix();
+            case "evidence" -> scheduleEvidenceStudy();
+            case "gc" -> scheduleGcStudy();
+            case "focus" -> scheduleFocusStudy();
             case "realworld" -> RealWorldValidationPlan.start();
             default -> false;
         };
@@ -115,6 +120,9 @@ public final class ValidationCommands {
                     case "all" -> 27_000L;
                     case "menus" -> 18_000L;
                     case "attribution" -> 32_000L;
+                    case "evidence" -> 55_000L;
+                    case "gc" -> 45_000L;
+                    case "focus" -> 25_000L;
                     default -> 12_000L;
                 };
                 schedule(() -> {
@@ -299,6 +307,84 @@ public final class ValidationCommands {
         schedule(() -> runStall("attribution-nested-c", 600L, true,
                 ControlledFreezeGenerator.Path.NESTED_A_TO_B_TO_C, 3), 18_000L);
         schedule(() -> PLAN_RUNNING.set(false), 25_000L);
+        return true;
+    }
+
+    private static int runEvidenceStudy(CommandContext<CommandSourceStack> context) {
+        if (!worldLoaded(context) || !scheduleEvidenceStudy()) {
+            return planBusy(context);
+        }
+        context.getSource().sendSuccess(() -> Component.literal(
+                "Detective validation: stack evidence study scheduled"), false);
+        return 1;
+    }
+
+    private static boolean scheduleEvidenceStudy() {
+        if (!PLAN_RUNNING.compareAndSet(false, true)) {
+            return false;
+        }
+        schedule(RealWorldValidationPlan::focusWindow, 0L);
+        ControlledFreezeGenerator.Path[] paths = {
+                ControlledFreezeGenerator.Path.DIRECT_A,
+                ControlledFreezeGenerator.Path.DIRECT_B,
+                ControlledFreezeGenerator.Path.SCHEDULED_STANDARD_C,
+                ControlledFreezeGenerator.Path.INDIRECT_A_TO_B,
+                ControlledFreezeGenerator.Path.NESTED_A_TO_B_TO_C,
+                ControlledFreezeGenerator.Path.A_TO_C,
+                ControlledFreezeGenerator.Path.B_TO_A,
+                ControlledFreezeGenerator.Path.C_TO_B,
+                ControlledFreezeGenerator.Path.B_TO_C_TO_A
+        };
+        for (int index = 0; index < paths.length; index++) {
+            ControlledFreezeGenerator.Path path = paths[index];
+            schedule(() -> runStall("evidence-" + path.name().toLowerCase(), 600L, true, path, 3),
+                    2_000L + index * 5_000L);
+        }
+        schedule(() -> PLAN_RUNNING.set(false), 42_000L);
+        return true;
+    }
+
+    private static boolean scheduleGcStudy() {
+        if (!PLAN_RUNNING.compareAndSet(false, true)) {
+            return false;
+        }
+        schedule(RealWorldValidationPlan::focusWindow, 0L);
+        schedule(() -> ValidationHarness.beginPhase("explicit_gc_pressure", false), 0L);
+        schedule(GcValidationScenario::start, 2_000L);
+        schedule(() -> {
+            ValidationHarness.beginPhase("gc_recovery", true);
+            PLAN_RUNNING.set(false);
+        }, 35_000L);
+        return true;
+    }
+
+    private static int runFocusStudy(CommandContext<CommandSourceStack> context) {
+        if (!worldLoaded(context) || !scheduleFocusStudy()) {
+            return planBusy(context);
+        }
+        context.getSource().sendSuccess(() -> Component.literal(
+                "Detective validation: focus continuity study scheduled"), false);
+        return 1;
+    }
+
+    private static boolean scheduleFocusStudy() {
+        if (!PLAN_RUNNING.compareAndSet(false, true)) {
+            return false;
+        }
+        schedule(RealWorldValidationPlan::focusWindow, 0L);
+        schedule(() -> ValidationHarness.beginPhase("focus_control", true), 0L);
+        schedule(() -> {
+            ValidationHarness.beginPhase("focus_iconified", true);
+            RealWorldValidationPlan.iconifyWindow();
+        }, 2_000L);
+        schedule(() -> {
+            RealWorldValidationPlan.restoreWindow();
+            ValidationHarness.beginPhase("focus_recovery", true);
+        }, 10_000L);
+        schedule(() -> {
+            ValidationHarness.beginPhase("focus_stable_after_recovery", true);
+            PLAN_RUNNING.set(false);
+        }, 18_000L);
         return true;
     }
 

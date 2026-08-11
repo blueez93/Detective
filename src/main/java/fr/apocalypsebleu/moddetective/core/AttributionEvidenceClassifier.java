@@ -36,19 +36,21 @@ public final class AttributionEvidenceClassifier {
         }
 
         int strongest = analysis.suspects().stream()
-                .mapToInt(SuspectAnalyzer.Suspect::samplesObserved)
+                .mapToInt(SuspectAnalyzer.Suspect::presenceSamples)
                 .max()
                 .orElse(0);
         AttributionEvidence.State state;
         double strongestShare = analysis.suspects().stream()
-                .mapToDouble(SuspectAnalyzer.Suspect::sampleSharePercent)
+                .mapToDouble(SuspectAnalyzer.Suspect::presenceSharePercent)
                 .max()
                 .orElse(0.0);
         if (!analysis.suspects().isEmpty()
                 && analysis.stackSamples() >= MINIMUM_STACK_SAMPLES
                 && strongest >= MINIMUM_STRONGEST_SUSPECT_SAMPLES
                 && strongestShare >= MINIMUM_STRONGEST_SUSPECT_SHARE_PERCENT) {
-            state = AttributionEvidence.State.ATTRIBUTED;
+            state = SuspectRankingModels.hasPracticallyEquivalentTopEvidence(analysis.suspects())
+                    ? AttributionEvidence.State.AMBIGUOUS_ATTRIBUTION
+                    : AttributionEvidence.State.ATTRIBUTED;
         } else if (!analysis.suspects().isEmpty() || snapshots.isEmpty()) {
             state = AttributionEvidence.State.INSUFFICIENT_EVIDENCE;
         } else if (gcMarkers > 0) {
