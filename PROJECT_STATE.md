@@ -5,8 +5,10 @@
 
 Detective should turn technical profiling evidence into a clear, cautious investigation for normal Minecraft players and modpack maintainers. Detective finds the evidence; the player makes the call.
 
-## v0.6 scope — Release Hardening
-No major product feature is added. v0.6 stress-tests the validated v0.3.1 engine, v0.4.1 UI and v0.5 local support workflow across loader checkpoints, corrupt files, privacy attacks, bounded queues/history, repeated connections, GC pauses and realistic runtime phases. The production attribution algorithm remains unchanged. Product copy follows: “Detect. Measure. Explain. Never accuse.”
+## v0.7 scope — Release Preparation
+v0.7.0-alpha.1 prepares the validated engine, investigation UI, and local support workflow for a first public alpha. It adds no product feature and does not change detection or attribution. Public metadata and documentation state the demonstrated Minecraft/NeoForge compatibility, client-only installation, local-only privacy model, and incomplete long-duration Medium/Large/Stress coverage honestly.
+
+The v0.6 Small Pack and loader matrix remain the stable performance baseline. The partial v0.6.1 campaign additionally demonstrated a short 4 GiB compatibility smoke with 166 physical JARs and 257 loaded mod ids under NeoForge 21.1.248. Long-duration Medium/Large/Stress soaks and physical UI/focus matrices remain not validated and are public alpha limitations.
 
 ### Production subsystems
 - Snapshot: pack state and version changes.

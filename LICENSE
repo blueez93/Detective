@@ -1,0 +1,138 @@
+DETECTIVE PROPRIETARY LICENSE 1.0
+
+Copyright © 2026 Apocalypse Bleu / Blue (blueez93).
+All rights reserved.
+
+This license governs the software project known as "Detective", including its source code, compiled binaries, documentation, assets, and official releases (the "Software"), except where a third-party component is expressly identified as being subject to a different license.
+
+1. DEFINITIONS
+
+"Licensor" means the copyright holder identified above.
+
+"Official Build" means an unmodified compiled release of Detective distributed by the Licensor through an official Detective distribution channel, including the official CurseForge project, official Modrinth project, official GitHub repository/releases, or another channel expressly designated by the Licensor.
+
+"Modpack" means a collection of Minecraft mods, configuration files, resource packs, data packs, or related files distributed together for use as a Minecraft installation or profile.
+
+2. PERSONAL USE
+
+You may download, install, run, and use Official Builds of Detective for personal, educational, testing, troubleshooting, modpack development, and Minecraft gameplay purposes.
+
+You may make private modifications to a copy of the source code solely for your own non-distributed use, testing, learning, or contribution development.
+
+3. MODPACK PERMISSION
+
+You may include an unmodified Official Build of Detective in a Modpack, including public Modpacks distributed through platforms such as CurseForge or Modrinth, subject to all of the following conditions:
+
+a. Detective must remain unmodified.
+b. Detective must not be presented as being authored, maintained, or endorsed by the Modpack author.
+c. Where the distribution platform supports an official project/dependency reference mechanism, the Modpack should use the official Detective project rather than creating a standalone mirror.
+d. The Modpack must not charge users specifically for Detective or for access to Detective features.
+e. Platform rewards, advertising revenue, donations, subscriptions, or other monetization of the Modpack as a whole do not by themselves violate this license, provided Detective itself is not sold or paywalled.
+f. Any platform rules and third-party license obligations remain the responsibility of the Modpack author.
+
+This section is an express permission to include Detective in Modpacks. No separate written permission is required while these conditions are satisfied.
+
+4. MEDIA AND CONTENT CREATION
+
+You may display, demonstrate, review, stream, record, screenshot, and discuss Detective in videos, livestreams, articles, tutorials, social media posts, and other media, including monetized media.
+
+This permission does not grant the right to redistribute the Software except as otherwise permitted by this license.
+
+5. SOURCE CODE ACCESS
+
+If the Detective source code is made publicly viewable, that publication does not make Detective open source.
+
+You may inspect the source code, study it, use it for debugging or interoperability work, create private modifications, and prepare contributions.
+
+Except where applicable law or the terms of the hosting platform grant otherwise, you may not redistribute the source code, publish modified versions, publish compiled derivative builds, or use substantial portions of the source code in another distributed project without prior written permission from the Licensor.
+
+Nothing in this license restricts the limited rights granted by a source hosting platform solely as necessary to view, store, or fork the repository using that platform's built-in functionality. Such a fork does not grant permission to distribute modified Detective builds or derivative projects.
+
+6. STANDALONE REDISTRIBUTION
+
+You may not reupload, mirror, host, redistribute, sublicense, or otherwise make standalone copies of Detective available to the public without prior written permission from the Licensor.
+
+This restriction does not prohibit Modpack distribution expressly allowed under Section 3.
+
+7. MODIFIED BUILDS AND DERIVATIVE PROJECTS
+
+You may not publicly distribute:
+
+a. modified Detective binaries;
+b. unofficial ports;
+c. forks or derivative versions of Detective;
+d. builds using substantial portions of Detective source code;
+e. projects presented as replacements, continuations, or unofficial editions of Detective;
+
+without prior written permission from the Licensor.
+
+Private modifications that are not distributed remain permitted under Section 2.
+
+8. COMMERCIAL RESTRICTIONS
+
+You may not sell, license for a fee, rent, commercially redistribute, or place Detective itself behind a paywall without prior written permission from the Licensor.
+
+This does not prohibit:
+
+a. monetized videos, streams, articles, or reviews;
+b. Modpacks receiving platform rewards or advertising revenue;
+c. voluntary donations or sponsorships supporting a Modpack or content creator;
+d. commercial Minecraft services merely recommending users install Detective;
+
+provided that users are not charged specifically for Detective or for access to its functionality.
+
+9. NAME, LOGO, AND BRANDING
+
+This license does not grant any general right to use the Detective name, logo, icon, visual identity, or other project branding.
+
+You may use the name "Detective" solely as reasonably necessary to identify the official mod in a permitted Modpack, compatibility list, review, tutorial, support request, or factual discussion.
+
+You may not use Detective branding in a way that falsely implies authorship, official status, sponsorship, endorsement, or affiliation.
+
+10. ATTRIBUTION AND AUTHORSHIP
+
+You may not remove or falsify copyright, authorship, license, or attribution notices included with Detective.
+
+You may not claim that you created or own Detective or an official Detective release.
+
+11. CONTRIBUTIONS
+
+Unless another written contribution agreement applies, by intentionally submitting source code, documentation, assets, fixes, or other material to the official Detective repository as a contribution, you represent that you have the right to submit that material and grant the Licensor a worldwide, perpetual, irrevocable, non-exclusive, royalty-free license to use, reproduce, modify, adapt, distribute, sublicense, relicense, and incorporate that contribution into Detective and related official releases.
+
+This section does not transfer ownership of your original contribution.
+
+12. THIRD-PARTY COMPONENTS
+
+Detective may interact with, depend upon, or include notices for third-party software. Third-party components remain governed by their respective licenses.
+
+This license grants no rights in Minecraft, NeoForge, or any third-party mod, library, trademark, or copyrighted work.
+
+13. NO WARRANTY
+
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, NON-INFRINGEMENT, AVAILABILITY, OR ERROR-FREE OPERATION.
+
+14. LIMITATION OF LIABILITY
+
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE LICENSOR SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, EXEMPLARY, OR PUNITIVE DAMAGES, OR FOR LOSS OF DATA, PROFITS, REVENUE, SAVES, MODPACKS, CONFIGURATIONS, OR GAME WORLDS ARISING FROM OR RELATED TO THE SOFTWARE OR ITS USE.
+
+Nothing in this license excludes or limits liability that cannot lawfully be excluded or limited.
+
+15. TERMINATION
+
+The permissions granted by this license terminate automatically if you materially violate its terms.
+
+Upon termination, you must stop exercising rights granted by this license, including prohibited redistribution, while retaining any rights that applicable law grants independently of this license.
+
+The Licensor may separately grant written exceptions or additional permissions.
+
+16. RESERVED RIGHTS
+
+All rights not expressly granted by this license are reserved by the Licensor.
+
+Detective is source-available only to the extent that its source code is made publicly viewable. This license is not an open-source license and does not grant the general rights to modify and redistribute that are characteristic of open-source software.
+
+17. APPLICABLE LAW
+
+Nothing in this license is intended to restrict rights that cannot legally be waived or limited under applicable law, including any mandatory rights relating to software interoperability, lawful reverse engineering, consumer protection, or similar statutory rights.
+
+END OF LICENSE

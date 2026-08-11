@@ -1,0 +1,85 @@
+name: Bug report
+description: Report unexpected Detective behavior without sharing private information.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping test Detective's Early Alpha.
+
+        Detective reports evidence, not proof that another mod is defective. Please review every diagnostic file before sharing it. Never include access tokens, session data, private server addresses, account identifiers, or other secrets.
+
+  - type: input
+    id: detective_version
+    attributes:
+      label: Detective version
+      placeholder: 0.7.0-alpha.1
+    validations:
+      required: true
+
+  - type: input
+    id: minecraft_version
+    attributes:
+      label: Minecraft version
+      placeholder: 1.21.1
+    validations:
+      required: true
+
+  - type: input
+    id: neoforge_version
+    attributes:
+      label: NeoForge version
+      placeholder: 21.1.248
+    validations:
+      required: true
+
+  - type: textarea
+    id: modpack
+    attributes:
+      label: Modpack or mod list
+      description: Name and version of the modpack, or a list of relevant installed mods and versions.
+    validations:
+      required: true
+
+  - type: textarea
+    id: happened
+    attributes:
+      label: What happened?
+      description: Describe the observed behavior and what you expected instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      placeholder: |
+        1. Open a world...
+        2. Perform...
+        3. Detective records...
+    validations:
+      required: true
+
+  - type: textarea
+    id: support_report
+    attributes:
+      label: Detective Support Report
+      description: Attach a Support Report if available. Inspect its contents before sharing. Do not attach latest.log automatically or include private information.
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional context
+      description: Add only non-sensitive details that may help reproduce the problem.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: privacy_confirmation
+    attributes:
+      label: Privacy confirmation
+      options:
+        - label: I reviewed the information and attachments and removed tokens, sessions, private addresses, personal identifiers, and other secrets.
+          required: true

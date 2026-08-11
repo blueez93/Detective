@@ -1,6 +1,6 @@
 modLoader="javafml"
 loaderVersion="${loader_version_range}"
-license="${mod_license}"
+license="${mod_license} (see LICENSE)"
 
 [[mods]]
 modId="${mod_id}"
@@ -8,7 +8,7 @@ version="${mod_version}"
 displayName="${mod_name}"
 authors="Blue"
 description='''
-Detective detects and measures Minecraft performance stalls, then presents cautious evidence about probable mod suspects.
+Client-side modpack diagnostics that detect performance stalls, preserve nearby performance history, and present cautious evidence about probable mod suspects.
 ''' 
 
 [[dependencies.${mod_id}]]
