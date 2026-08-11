@@ -28,8 +28,9 @@ public final class IncidentListScreen extends Screen {
     @Override
     protected void init() {
         this.list = this.addRenderableWidget(new IncidentSelectionList(
-                this.minecraft, this.width, Math.max(20, this.height - 80),
-                DetectiveUiRenderer.HEADER_HEIGHT + 2, 48));
+                this.minecraft, this.width,
+                Math.max(20, this.height - DetectiveUiRenderer.HEADER_HEIGHT - DetectiveUiRenderer.FOOTER_HEIGHT + 2),
+                DetectiveUiRenderer.HEADER_HEIGHT + 2, 64));
         this.addRenderableWidget(Button.builder(CommonComponents.GUI_BACK, button -> onClose())
                 .bounds(this.width / 2 - 50, this.height - 28, 100, 20)
                 .build());
@@ -58,7 +59,7 @@ public final class IncidentListScreen extends Screen {
         DetectiveUiRenderer.header(graphics, this.font, this.width,
                 Component.translatable("detective.ui.incidents.title"),
                 Component.translatable("detective.ui.incidents.subtitle"));
-        DetectiveUiRenderer.footer(graphics, this.width, this.height);
+        DetectiveUiRenderer.footer(graphics, this.font, this.width, this.height);
         DetectiveUiRenderer.widgets(this, graphics, mouseX, mouseY, partialTick);
         if (loading) {
             graphics.drawCenteredString(this.font, Component.translatable("detective.ui.loading"),
@@ -67,8 +68,15 @@ public final class IncidentListScreen extends Screen {
             graphics.drawCenteredString(this.font, Component.translatable("detective.ui.load_failed"),
                     this.width / 2, this.height / 2, 0xFFFF7777);
         } else if (list.isEmpty()) {
-            graphics.drawCenteredString(this.font, Component.translatable("detective.ui.incidents.empty"),
-                    this.width / 2, this.height / 2 - 5, DetectiveUiRenderer.MUTED);
+            int y = this.height / 2 - 24;
+            graphics.drawCenteredString(this.font, Component.translatable("detective.ui.incidents.empty.title"),
+                    this.width / 2, y, DetectiveUiRenderer.TEXT);
+            y = DetectiveUiRenderer.centeredWrappedText(graphics, this.font,
+                    Component.translatable("detective.ui.incidents.empty.body"), this.width / 2, y + 16,
+                    Math.min(420, this.width - 32), DetectiveUiRenderer.MUTED);
+            DetectiveUiRenderer.centeredWrappedText(graphics, this.font,
+                    Component.translatable("detective.ui.incidents.empty.hint"), this.width / 2, y + 3,
+                    Math.min(420, this.width - 32), DetectiveUiRenderer.MUTED);
         }
     }
 
@@ -116,18 +124,27 @@ public final class IncidentListScreen extends Screen {
                 if (hovered) {
                     graphics.fill(left, top, left + width, top + height, 0x553A4B5C);
                 }
-                String primary = incident.hasPrimarySuspect()
-                        ? Component.translatable("detective.ui.primary_short", incident.primarySuspect()).getString()
-                        : Component.translatable(incident.evidence().translationKey()).getString();
-                String firstLine = UiFormatters.duration(incident.durationMs()) + "  •  " + primary;
+                Component duration = Component.translatable("detective.ui.incidents.freeze",
+                        UiFormatters.duration(incident.durationMs()));
                 int badgeWidth = DetectiveUiRenderer.badgeWidth(font, incident.evidence());
-                graphics.drawString(font, font.plainSubstrByWidth(firstLine, Math.max(20, width - badgeWidth - 16)),
+                graphics.drawString(font, duration,
                         left + 6, top + 6, DetectiveUiRenderer.TEXT, false);
                 DetectiveUiRenderer.badge(graphics, font, incident.evidence(),
                         left + width - badgeWidth - 5, top + 3);
-                String context = incident.occurredAt() + "  •  " + incident.dimension() + "  •  " + incident.coordinates();
-                graphics.drawString(font, font.plainSubstrByWidth(context, width - 12),
-                        left + 6, top + 24, DetectiveUiRenderer.MUTED, false);
+                Component primary = incident.hasPrimarySuspect()
+                        ? Component.translatable("detective.ui.primary_short", incident.primarySuspect())
+                        : Component.translatable(incident.evidence().listSummaryKey());
+                var primaryLines = font.split(primary, width - 12);
+                int lineY = top + 21;
+                for (int line = 0; line < Math.min(2, primaryLines.size()); line++) {
+                    graphics.drawString(font, primaryLines.get(line), left + 6, lineY,
+                            line == 0 ? DetectiveUiRenderer.TEXT : DetectiveUiRenderer.MUTED, false);
+                    lineY += font.lineHeight + 1;
+                }
+                Component context = Component.translatable("detective.ui.incidents.context",
+                        incident.occurredAt(), incident.dimension(), incident.coordinates());
+                graphics.drawString(font, font.plainSubstrByWidth(context.getString(), width - 12),
+                        left + 6, top + 50, DetectiveUiRenderer.MUTED, false);
             }
 
             @Override
@@ -142,10 +159,11 @@ public final class IncidentListScreen extends Screen {
 
             @Override
             public Component getNarration() {
-                return Component.literal(UiFormatters.duration(incident.durationMs()) + ", "
-                        + (incident.hasPrimarySuspect() ? incident.primarySuspect()
-                        : Component.translatable(incident.evidence().translationKey()).getString())
-                        + ", " + incident.occurredAt());
+                return Component.translatable("detective.ui.incidents.narration",
+                        UiFormatters.duration(incident.durationMs()),
+                        incident.hasPrimarySuspect() ? incident.primarySuspect()
+                                : Component.translatable(incident.evidence().translationKey()),
+                        incident.occurredAt());
             }
         }
     }

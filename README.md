@@ -4,6 +4,8 @@ Minecraft 1.21.1 / NeoForge 21.1.235 / Java 21.
 
 Detective is a client-only diagnostic mod that records evidence around render-thread freezes and ranks the non-vanilla mods observed in watchdog stack samples. A suspect score is evidence, not proof of causality.
 
+Its product-copy rule is: **Detect. Measure. Explain. Never accuse.**
+
 ## Production engine
 
 - Captures installed mods and versions, then compares them with the previous launch.

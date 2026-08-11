@@ -23,6 +23,19 @@ class EvidenceBadgeTest {
         assertEquals(EvidenceBadge.UNKNOWN, EvidenceBadge.from("future_state", null));
     }
 
+    @Test
+    void mapsSpecialStatesToCautiousUserFacingCopy() {
+        assertEquals("detective.ui.evidence.ambiguous",
+                EvidenceBadge.AMBIGUOUS_ATTRIBUTION.translationKey());
+        assertEquals("detective.ui.incidents.card.ambiguous",
+                EvidenceBadge.AMBIGUOUS_ATTRIBUTION.listSummaryKey());
+        assertEquals("detective.ui.evidence.system", EvidenceBadge.JVM_GC_SUSPECTED.translationKey());
+        assertEquals("detective.ui.evidence.system",
+                EvidenceBadge.NATIVE_OR_DRIVER_STALL_POSSIBLE.translationKey());
+        assertEquals("detective.ui.incidents.card.system",
+                EvidenceBadge.NATIVE_OR_DRIVER_STALL_POSSIBLE.listSummaryKey());
+    }
+
     private static SuspectViewModel suspect(int leafSamples, double leafShare) {
         return new SuspectViewModel(
                 "example", "Example", "1", leafSamples, leafShare,

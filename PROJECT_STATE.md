@@ -1,9 +1,9 @@
 # Detective project state
 
 ## Product promise
-"Your modpack is lagging. Find the culprit."
+"Detect. Measure. Explain. Never accuse."
 
-Detective should turn technical profiling evidence into a simple diagnosis for normal Minecraft players and modpack maintainers.
+Detective should turn technical profiling evidence into a clear, cautious investigation for normal Minecraft players and modpack maintainers. Detective finds the evidence; the player makes the call.
 
 ## v0.4 scope — First usable client UI
 A lightweight, vanilla-friendly client interface over the validated v0.3.1 engine. It exposes persisted incidents, cautious evidence states, Black Box history, and launch-to-launch modpack changes without changing the production attribution algorithm.

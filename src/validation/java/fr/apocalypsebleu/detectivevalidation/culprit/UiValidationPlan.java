@@ -7,8 +7,13 @@ import fr.apocalypsebleu.moddetective.client.ui.IncidentListScreen;
 import fr.apocalypsebleu.moddetective.client.ui.ModpackChangesScreen;
 import fr.apocalypsebleu.moddetective.client.ClientPerformanceEvents;
 import fr.apocalypsebleu.moddetective.client.ui.data.DetectiveUiService;
+import fr.apocalypsebleu.moddetective.client.ui.model.BlackBoxPoint;
+import fr.apocalypsebleu.moddetective.client.ui.model.EvidenceBadge;
+import fr.apocalypsebleu.moddetective.client.ui.model.IncidentDetailViewModel;
 import fr.apocalypsebleu.moddetective.client.ui.model.IncidentIndexViewModel;
 import fr.apocalypsebleu.moddetective.client.ui.model.IncidentSummaryViewModel;
+import fr.apocalypsebleu.moddetective.client.ui.model.ModpackChangesViewModel;
+import fr.apocalypsebleu.moddetective.client.ui.model.SuspectViewModel;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
 import net.minecraft.client.gui.components.Button;
@@ -20,6 +25,9 @@ import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.network.chat.Component;
 import net.neoforged.fml.loading.FMLPaths;
 
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /** Development-only screenshot route for the v0.4 screens. */
@@ -135,57 +143,230 @@ public final class UiValidationPlan {
     }
 
     private static void scheduleScreens(IncidentIndexViewModel index, boolean worldAvailable) {
+        List<IncidentDetailViewModel> states = List.of(
+                syntheticDetail(EvidenceBadge.HIGH_EVIDENCE, false),
+                syntheticDetail(EvidenceBadge.MODERATE_EVIDENCE, false),
+                syntheticDetail(EvidenceBadge.LOW_EVIDENCE, false),
+                syntheticDetail(EvidenceBadge.AMBIGUOUS_ATTRIBUTION, false),
+                syntheticDetail(EvidenceBadge.INSUFFICIENT_EVIDENCE, false),
+                syntheticDetail(EvidenceBadge.NATIVE_OR_DRIVER_STALL_POSSIBLE, false),
+                syntheticDetail(EvidenceBadge.UNKNOWN, false));
+        IncidentDetailViewModel partialBlackBox = syntheticDetail(EvidenceBadge.HIGH_EVIDENCE, true);
+        long now = System.currentTimeMillis();
+        IncidentIndexViewModel visualIndex = IncidentIndexViewModel.create(
+                states.stream().map(IncidentDetailViewModel::summary).toList(),
+                now, now - 60_000L, 0);
+        IncidentIndexViewModel emptyIndex = IncidentIndexViewModel.empty(now, now - 60_000L);
+
         schedule(() -> Minecraft.getInstance().setScreen(
                 worldAvailable ? new PauseScreen(true) : new TitleScreen()), 0L);
-        schedule(() -> screenshot("detective-v04-01-pause-entry.png"), 1_500L);
+        schedule(() -> screenshot("detective-v041-01-pause-entry.png"), 1_500L);
 
         schedule(() -> {
             Screen parent = Minecraft.getInstance().screen;
-            Minecraft.getInstance().setScreen(new DetectiveHomeScreen(parent));
+            Minecraft.getInstance().setScreen(new DetectiveHomeScreen(parent, visualIndex));
         }, 2_500L);
-        schedule(() -> screenshot("detective-v04-02-home.png"), 4_500L);
+        schedule(() -> screenshot("detective-v041-02-home-with-incidents.png"), 4_000L);
+
+        schedule(() -> scrollHome(-6.0), 4_300L);
+        schedule(() -> screenshot("detective-v041-02b-home-session-summary.png"), 5_500L);
+
+        schedule(() -> Minecraft.getInstance().setScreen(new DetectiveHomeScreen(
+                Minecraft.getInstance().screen, emptyIndex)), 6_200L);
+        schedule(() -> screenshot("detective-v041-03-home-empty.png"), 7_600L);
 
         schedule(() -> Minecraft.getInstance().setScreen(new IncidentListScreen(
-                Minecraft.getInstance().screen, index)), 5_500L);
-        schedule(() -> screenshot("detective-v04-03-incidents-real.png"), 7_000L);
+                Minecraft.getInstance().screen, visualIndex)), 8_400L);
+        schedule(() -> screenshot("detective-v041-04-incidents-multiple.png"), 9_800L);
 
-        IncidentSummaryViewModel selectedIncident = index.incidents().stream()
-                .filter(IncidentSummaryViewModel::hasPrimarySuspect)
-                .findFirst()
-                .orElse(index.incidents().isEmpty() ? null : index.incidents().getFirst());
-        if (selectedIncident != null) {
-            schedule(() -> Minecraft.getInstance().setScreen(new IncidentDetailScreen(
-                    Minecraft.getInstance().screen, selectedIncident)), 8_000L);
-            schedule(() -> screenshot("detective-v04-04-incident-detail.png"), 10_500L);
-            schedule(() -> {
-                if (Minecraft.getInstance().screen instanceof IncidentDetailScreen detailScreen) {
-                    detailScreen.mouseScrolled(0.0, 0.0, 0.0, -9.0);
-                }
-            }, 11_000L);
-            schedule(() -> screenshot("detective-v04-04b-incident-black-box.png"), 12_500L);
-        }
+        showDetail(states.get(0), "detective-v041-05-high-evidence.png", 10_600L, 0.0);
+        schedule(() -> scrollDetail(-4.5), 12_300L);
+        schedule(() -> screenshot("detective-v041-05b-primary-why.png"), 13_500L);
+        schedule(() -> scrollDetail(-3.5), 13_600L);
+        schedule(() -> screenshot("detective-v041-05c-primary-caution.png"), 13_750L);
+
+        schedule(() -> Minecraft.getInstance().setScreen(new IncidentDetailScreen(
+                Minecraft.getInstance().screen, states.get(0))), 13_800L);
+        schedule(() -> scrollDetail(-15.0), 14_700L);
+        schedule(() -> screenshot("detective-v041-06-black-box-complete.png"), 15_800L);
+        schedule(() -> scrollDetail(-6.5), 16_100L);
+        schedule(() -> screenshot("detective-v041-06b-black-box-metadata.png"), 17_300L);
+
+        schedule(() -> Minecraft.getInstance().setScreen(new IncidentDetailScreen(
+                Minecraft.getInstance().screen, states.get(0))), 17_600L);
+        schedule(() -> scrollDetail(-25.4), 18_500L);
+        schedule(() -> screenshot("detective-v041-07-technical-evidence.png"), 19_600L);
+        schedule(() -> scrollDetail(-3.0), 19_900L);
+        schedule(() -> screenshot("detective-v041-07b-technical-evidence-bottom.png"), 21_000L);
+
+        showDetail(states.get(1), "detective-v041-08-moderate-evidence.png", 21_500L, -4.5);
+        showDetail(states.get(2), "detective-v041-09-low-evidence.png", 23_500L, -4.5);
+        showDetail(states.get(3), "detective-v041-10-ambiguous.png", 25_500L, -4.5);
+        showDetail(states.get(4), "detective-v041-11-insufficient.png", 27_500L, -4.5);
+        showDetail(states.get(5), "detective-v041-12-system-stall.png", 29_500L, -4.5);
+        showDetail(states.get(6), "detective-v041-13-unknown.png", 31_500L, -4.5);
+
+        schedule(() -> Minecraft.getInstance().setScreen(new IncidentDetailScreen(
+                Minecraft.getInstance().screen, partialBlackBox)), 33_500L);
+        schedule(() -> scrollDetail(-15.0), 34_400L);
+        schedule(() -> screenshot("detective-v041-14-black-box-partial.png"), 35_500L);
+        schedule(() -> scrollDetail(-6.5), 35_800L);
+        schedule(() -> screenshot("detective-v041-15-black-box-partial-message.png"), 37_000L);
+
+        ModpackChangesViewModel changedPack = syntheticModpackChanges();
+        schedule(() -> Minecraft.getInstance().setScreen(new ModpackChangesScreen(
+                Minecraft.getInstance().screen, changedPack)), 37_500L);
+        schedule(() -> screenshot("detective-v041-16-modpack-changes.png"), 38_900L);
+        schedule(() -> scrollCurrentScreen(-5.0), 39_200L);
+        schedule(() -> screenshot("detective-v041-16b-modpack-removed.png"), 40_400L);
 
         schedule(() -> Minecraft.getInstance().setScreen(new ModpackChangesScreen(
-                Minecraft.getInstance().screen)), 13_500L);
-        schedule(() -> screenshot("detective-v04-05-modpack-changes.png"), 15_000L);
+                Minecraft.getInstance().screen,
+                new ModpackChangesViewModel(true, 42, List.of()))), 41_000L);
+        schedule(() -> screenshot("detective-v041-17-modpack-empty.png"), 42_400L);
+
+        schedule(() -> Minecraft.getInstance().setScreen(new ModpackChangesScreen(
+                Minecraft.getInstance().screen,
+                new ModpackChangesViewModel(false, 42, List.of()))), 43_000L);
+        schedule(() -> screenshot("detective-v041-18-modpack-no-snapshot.png"), 44_400L);
 
         schedule(() -> Minecraft.getInstance().setScreen(new IncidentListScreen(
-                Minecraft.getInstance().screen,
-                IncidentIndexViewModel.empty(System.currentTimeMillis(), ModDetective.SESSION_STARTED_AT_EPOCH_MS))), 16_000L);
-        schedule(() -> screenshot("detective-v04-06-incidents-empty.png"), 17_500L);
+                Minecraft.getInstance().screen, emptyIndex)), 45_000L);
+        schedule(() -> screenshot("detective-v041-19-incidents-empty.png"), 46_400L);
 
-        schedule(() -> Minecraft.getInstance().setScreen(new TitleScreen()), 19_000L);
-        schedule(() -> screenshot("detective-v04-07-title-entry.png"), 21_500L);
-        schedule(() -> {
-            RUNNING.set(false);
-            DetectiveTestCulprit.LOGGER.info("[Detective Validation] UI screenshot route completed");
-        }, 23_000L);
+        schedule(() -> beginFrenchValidation(states.get(3)), 47_000L);
+    }
+
+    private static void showDetail(
+            IncidentDetailViewModel detail,
+            String screenshot,
+            long startMs,
+            double scrollAmount
+    ) {
+        schedule(() -> Minecraft.getInstance().setScreen(new IncidentDetailScreen(
+                Minecraft.getInstance().screen, detail)), startMs);
+        if (scrollAmount != 0.0) {
+            schedule(() -> scrollDetail(scrollAmount), startMs + 800L);
+        }
+        schedule(() -> screenshot(screenshot), startMs + 1_400L);
+    }
+
+    private static void scrollHome(double amount) {
+        if (Minecraft.getInstance().screen instanceof DetectiveHomeScreen homeScreen) {
+            homeScreen.mouseScrolled(0.0, 0.0, 0.0, amount);
+        }
+    }
+
+    private static void scrollCurrentScreen(double amount) {
+        Screen screen = Minecraft.getInstance().screen;
+        if (screen != null) {
+            screen.mouseScrolled(screen.width / 2.0, screen.height / 2.0, 0.0, amount);
+        }
+    }
+
+    private static void scrollDetail(double amount) {
+        if (Minecraft.getInstance().screen instanceof IncidentDetailScreen detailScreen) {
+            detailScreen.mouseScrolled(0.0, 0.0, 0.0, amount);
+        }
+    }
+
+    private static void beginFrenchValidation(IncidentDetailViewModel ambiguous) {
+        Minecraft minecraft = Minecraft.getInstance();
+        DetectiveTestCulprit.LOGGER.info("[Detective Validation] Switching visual validation to fr_fr");
+        minecraft.getLanguageManager().setSelected("fr_fr");
+        minecraft.reloadResourcePacks().whenComplete((ignored, error) -> {
+            if (error != null) {
+                DetectiveTestCulprit.LOGGER.error(
+                        "[Detective Validation] Could not reload fr_fr resources", error);
+            }
+            schedule(() -> Minecraft.getInstance().setScreen(new IncidentDetailScreen(
+                    Minecraft.getInstance().screen, ambiguous)), 1_000L);
+            schedule(() -> scrollDetail(-4.5), 2_000L);
+            schedule(() -> screenshot("detective-v041-20-fr-ambiguous.png"), 2_800L);
+            schedule(() -> Minecraft.getInstance().setScreen(new ModpackChangesScreen(
+                    Minecraft.getInstance().screen,
+                    new ModpackChangesViewModel(false, 42, List.of()))), 3_600L);
+            schedule(() -> screenshot("detective-v041-21-fr-no-snapshot.png"), 5_200L);
+            schedule(() -> Minecraft.getInstance().setScreen(new TitleScreen()), 6_000L);
+            schedule(() -> screenshot("detective-v041-22-title-entry.png"), 7_800L);
+            schedule(UiValidationPlan::complete, 8_800L);
+        });
+    }
+
+    private static void complete() {
+        RUNNING.set(false);
+        DetectiveTestCulprit.LOGGER.info("[Detective Validation] UI screenshot route completed");
         if (Boolean.getBoolean("detective.validation.exitAfterAutorun")) {
             schedule(() -> {
-                DetectiveTestCulprit.LOGGER.info("[Detective Validation] UI route complete; stopping Minecraft cleanly");
+                DetectiveTestCulprit.LOGGER.info(
+                        "[Detective Validation] UI route complete; stopping Minecraft cleanly");
                 Minecraft.getInstance().stop();
-            }, 25_000L);
+            }, 1_500L);
         }
+    }
+
+    private static IncidentDetailViewModel syntheticDetail(EvidenceBadge evidence, boolean partialBlackBox) {
+        int samples = 30;
+        int leaf = switch (evidence) {
+            case HIGH_EVIDENCE -> 29;
+            case MODERATE_EVIDENCE -> 18;
+            case LOW_EVIDENCE -> 4;
+            case AMBIGUOUS_ATTRIBUTION -> 15;
+            default -> 0;
+        };
+        boolean attributed = evidence.isAttributedTier();
+        List<SuspectViewModel> suspects = new ArrayList<>();
+        if (attributed || evidence == EvidenceBadge.AMBIGUOUS_ATTRIBUTION) {
+            suspects.add(suspect("create", "Create", leaf, samples));
+            suspects.add(suspect("example_library", "Example Library", evidence == EvidenceBadge.AMBIGUOUS_ATTRIBUTION
+                    ? leaf : Math.max(1, leaf / 3), samples));
+        }
+        String rawState = switch (evidence) {
+            case HIGH_EVIDENCE, MODERATE_EVIDENCE, LOW_EVIDENCE -> "ATTRIBUTED";
+            case AMBIGUOUS_ATTRIBUTION -> "AMBIGUOUS_ATTRIBUTION";
+            case INSUFFICIENT_EVIDENCE -> "INSUFFICIENT_EVIDENCE";
+            case JVM_GC_SUSPECTED -> "JVM_GC_SUSPECTED";
+            case NATIVE_OR_DRIVER_STALL_POSSIBLE -> "NATIVE_OR_DRIVER_STALL_POSSIBLE";
+            case UNKNOWN -> "UNKNOWN";
+        };
+        long now = System.currentTimeMillis();
+        IncidentSummaryViewModel summary = new IncidentSummaryViewModel(
+                "#0042", Path.of("visual-" + evidence.name() + ".json"), now,
+                621.0, 120.0, samples, evidence, rawState,
+                attributed ? "Create" : "", attributed,
+                "2026-08-11 14:32:08", "Overworld", "128, 64, -342");
+        List<BlackBoxPoint> blackBox = partialBlackBox
+                ? List.of(new BlackBoxPoint(now, 621.0, 1.6, 900L * 1024L * 1024L))
+                : syntheticBlackBox(now);
+        return new IncidentDetailViewModel(summary, suspects, blackBox,
+                blackBox.size(), partialBlackBox);
+    }
+
+    private static SuspectViewModel suspect(String modId, String name, int leaf, int samples) {
+        double share = samples == 0 ? 0.0 : leaf * 100.0 / samples;
+        return new SuspectViewModel(
+                modId, name, "1.0", Math.max(leaf, 1), share, leaf, share,
+                2.0, 2, Math.max(0, leaf - 1), 0, 2);
+    }
+
+    private static List<BlackBoxPoint> syntheticBlackBox(long now) {
+        List<BlackBoxPoint> points = new ArrayList<>();
+        for (int index = 0; index < 48; index++) {
+            double frameMs = index == 37 ? 621.0 : 13.0 + (index % 5);
+            points.add(new BlackBoxPoint(now - (48L - index) * 50L, frameMs,
+                    1_000.0 / frameMs, (820L + index) * 1024L * 1024L));
+        }
+        return List.copyOf(points);
+    }
+
+    private static ModpackChangesViewModel syntheticModpackChanges() {
+        return new ModpackChangesViewModel(true, 42, List.of(
+                new ModpackChangesViewModel.Change(ModpackChangesViewModel.Type.ADDED,
+                        "new_content", "New Content", "", "2.0.0"),
+                new ModpackChangesViewModel.Change(ModpackChangesViewModel.Type.UPDATED,
+                        "create", "Create", "6.0.0", "6.0.2"),
+                new ModpackChangesViewModel.Change(ModpackChangesViewModel.Type.REMOVED,
+                        "old_qol", "Old QoL", "1.4.1", "")));
     }
 
     private static void screenshot(String fileName) {

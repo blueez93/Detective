@@ -27,6 +27,17 @@ public final class UiFormatters {
         return String.format(Locale.ROOT, "%.1f%%", value);
     }
 
+    public static String memory(long bytes) {
+        if (bytes < 0L) {
+            return "—";
+        }
+        double mebibytes = bytes / (1024.0 * 1024.0);
+        if (mebibytes >= 1024.0) {
+            return String.format(Locale.ROOT, "%.2f GiB", mebibytes / 1024.0);
+        }
+        return String.format(Locale.ROOT, "%.1f MiB", mebibytes);
+    }
+
     public static String dateTime(long epochMs) {
         if (epochMs <= 0L) {
             return "—";

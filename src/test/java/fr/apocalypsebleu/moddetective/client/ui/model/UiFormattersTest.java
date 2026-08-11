@@ -10,6 +10,8 @@ class UiFormattersTest {
         assertEquals("150.0 ms", UiFormatters.duration(150.0));
         assertEquals("1.20 s", UiFormatters.duration(1_200.0));
         assertEquals("62.5%", UiFormatters.percent(62.5));
+        assertEquals("512.0 MiB", UiFormatters.memory(512L * 1024L * 1024L));
+        assertEquals("1.50 GiB", UiFormatters.memory(1536L * 1024L * 1024L));
     }
 
     @Test

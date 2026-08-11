@@ -124,7 +124,7 @@ public final class ValidationCommands {
                     case "evidence" -> 55_000L;
                     case "gc" -> 45_000L;
                     case "focus" -> 25_000L;
-                    case "ui" -> 27_000L;
+                    case "ui" -> 70_000L;
                     default -> 12_000L;
                 };
                 schedule(() -> {

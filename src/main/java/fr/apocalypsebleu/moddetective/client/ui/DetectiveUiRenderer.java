@@ -8,7 +8,7 @@ import net.minecraft.network.chat.Component;
 
 final class DetectiveUiRenderer {
     static final int HEADER_HEIGHT = 42;
-    static final int FOOTER_HEIGHT = 34;
+    static final int FOOTER_HEIGHT = 46;
     static final int TEXT = 0xFFE6E6E6;
     static final int MUTED = 0xFFAAAAAA;
     static final int PANEL = 0xCC111820;
@@ -24,9 +24,11 @@ final class DetectiveUiRenderer {
         graphics.drawCenteredString(font, subtitle, width / 2, 23, MUTED);
     }
 
-    static void footer(GuiGraphics graphics, int width, int height) {
+    static void footer(GuiGraphics graphics, Font font, int width, int height) {
         graphics.fill(0, height - FOOTER_HEIGHT, width, height, 0xDD0B1118);
         graphics.fill(0, height - FOOTER_HEIGHT, width, height - FOOTER_HEIGHT + 1, 0xFF354657);
+        Component tagline = Component.translatable("detective.ui.tagline");
+        graphics.drawCenteredString(font, tagline, width / 2, height - FOOTER_HEIGHT + 7, MUTED);
     }
 
     static void panel(GuiGraphics graphics, int x, int y, int width, int height) {
@@ -64,6 +66,27 @@ final class DetectiveUiRenderer {
         var lines = font.split(text, width);
         for (var line : lines) {
             graphics.drawString(font, line, x, y, color, false);
+            y += font.lineHeight + 2;
+        }
+        return y;
+    }
+
+    static int wrappedHeight(Font font, Component text, int width) {
+        return font.split(text, width).size() * (font.lineHeight + 2);
+    }
+
+    static int centeredWrappedText(
+            GuiGraphics graphics,
+            Font font,
+            Component text,
+            int centerX,
+            int y,
+            int width,
+            int color
+    ) {
+        var lines = font.split(text, width);
+        for (var line : lines) {
+            graphics.drawCenteredString(font, line, centerX, y, color);
             y += font.lineHeight + 2;
         }
         return y;
