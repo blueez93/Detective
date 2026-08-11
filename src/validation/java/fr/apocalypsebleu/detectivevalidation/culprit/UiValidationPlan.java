@@ -1,11 +1,15 @@
 package fr.apocalypsebleu.detectivevalidation.culprit;
 
-import fr.apocalypsebleu.moddetective.ModDetective;
 import fr.apocalypsebleu.moddetective.client.ui.DetectiveHomeScreen;
 import fr.apocalypsebleu.moddetective.client.ui.IncidentDetailScreen;
 import fr.apocalypsebleu.moddetective.client.ui.IncidentListScreen;
 import fr.apocalypsebleu.moddetective.client.ui.ModpackChangesScreen;
+import fr.apocalypsebleu.moddetective.client.ui.ExportSupportReportScreen;
+import fr.apocalypsebleu.moddetective.client.ui.SupportReportCreatedScreen;
+import fr.apocalypsebleu.moddetective.client.ui.DetectiveSettingsScreen;
+import fr.apocalypsebleu.moddetective.client.ui.ClearIncidentHistoryScreen;
 import fr.apocalypsebleu.moddetective.client.ClientPerformanceEvents;
+import fr.apocalypsebleu.moddetective.client.support.DetectiveSupportService;
 import fr.apocalypsebleu.moddetective.client.ui.data.DetectiveUiService;
 import fr.apocalypsebleu.moddetective.client.ui.model.BlackBoxPoint;
 import fr.apocalypsebleu.moddetective.client.ui.model.EvidenceBadge;
@@ -14,6 +18,14 @@ import fr.apocalypsebleu.moddetective.client.ui.model.IncidentIndexViewModel;
 import fr.apocalypsebleu.moddetective.client.ui.model.IncidentSummaryViewModel;
 import fr.apocalypsebleu.moddetective.client.ui.model.ModpackChangesViewModel;
 import fr.apocalypsebleu.moddetective.client.ui.model.SuspectViewModel;
+import fr.apocalypsebleu.moddetective.core.AttributionEvidence;
+import fr.apocalypsebleu.moddetective.core.FrameSample;
+import fr.apocalypsebleu.moddetective.core.FreezeIncident;
+import fr.apocalypsebleu.moddetective.core.SuspectAnalyzer;
+import fr.apocalypsebleu.moddetective.storage.ModDetectivePaths;
+import fr.apocalypsebleu.moddetective.support.DetectiveSettings;
+import fr.apocalypsebleu.moddetective.support.report.SupportReportData;
+import fr.apocalypsebleu.moddetective.support.report.SupportReportExporter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
 import net.minecraft.client.gui.components.Button;
@@ -26,11 +38,12 @@ import net.minecraft.network.chat.Component;
 import net.neoforged.fml.loading.FMLPaths;
 
 import java.nio.file.Path;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/** Development-only screenshot route for the v0.4 screens. */
+/** Development-only screenshot route for the v0.4 investigation and v0.5 support screens. */
 public final class UiValidationPlan {
     private static final String VALIDATION_WORLD = "DetectiveValidation";
     private static final AtomicBoolean RUNNING = new AtomicBoolean();
@@ -234,7 +247,33 @@ public final class UiValidationPlan {
                 Minecraft.getInstance().screen, emptyIndex)), 45_000L);
         schedule(() -> screenshot("detective-v041-19-incidents-empty.png"), 46_400L);
 
-        schedule(() -> beginFrenchValidation(states.get(3)), 47_000L);
+        schedule(() -> Minecraft.getInstance().setScreen(new ExportSupportReportScreen(
+                Minecraft.getInstance().screen, states.get(0).summary())), 47_000L);
+        schedule(() -> screenshot("detective-v050-20-export-preview.png"), 48_400L);
+
+        schedule(() -> Minecraft.getInstance().setScreen(new SupportReportCreatedScreen(
+                Minecraft.getInstance().screen,
+                ModDetectivePaths.reports().resolve("detective-report-2026-08-11_21-42-16.zip"))), 49_000L);
+        schedule(() -> screenshot("detective-v050-21-export-success.png"), 50_400L);
+
+        schedule(() -> Minecraft.getInstance().setScreen(new DetectiveSettingsScreen(
+                Minecraft.getInstance().screen, DetectiveSettings.defaults())), 51_000L);
+        schedule(() -> screenshot("detective-v050-22-settings.png"), 52_400L);
+
+        schedule(() -> {
+            if (Minecraft.getInstance().screen instanceof DetectiveSettingsScreen settingsScreen) {
+                Minecraft.getInstance().setScreen(new ClearIncidentHistoryScreen(settingsScreen));
+            }
+        }, 53_000L);
+        schedule(() -> screenshot("detective-v050-23-clear-history.png"), 54_400L);
+
+        schedule(() -> createRuntimeValidationReport(states.get(0)), 54_600L);
+        schedule(() -> showNotificationBurst(states.get(0)), 55_000L);
+        schedule(() -> Minecraft.getInstance().setScreen(
+                worldAvailable ? new PauseScreen(true) : new TitleScreen()), 57_400L);
+        schedule(() -> screenshot("detective-v050-24-notification-cooldown.png"), 58_200L);
+
+        schedule(() -> beginFrenchValidation(states.get(3)), 59_000L);
     }
 
     private static void showDetail(
@@ -287,9 +326,15 @@ public final class UiValidationPlan {
                     Minecraft.getInstance().screen,
                     new ModpackChangesViewModel(false, 42, List.of()))), 3_600L);
             schedule(() -> screenshot("detective-v041-21-fr-no-snapshot.png"), 5_200L);
-            schedule(() -> Minecraft.getInstance().setScreen(new TitleScreen()), 6_000L);
-            schedule(() -> screenshot("detective-v041-22-title-entry.png"), 7_800L);
-            schedule(UiValidationPlan::complete, 8_800L);
+            schedule(() -> Minecraft.getInstance().setScreen(new DetectiveSettingsScreen(
+                    Minecraft.getInstance().screen, DetectiveSettings.defaults())), 5_800L);
+            schedule(() -> screenshot("detective-v050-25-fr-settings.png"), 7_000L);
+            schedule(() -> Minecraft.getInstance().setScreen(new ExportSupportReportScreen(
+                    Minecraft.getInstance().screen, ambiguous.summary())), 7_600L);
+            schedule(() -> screenshot("detective-v050-26-fr-export-preview.png"), 8_800L);
+            schedule(() -> Minecraft.getInstance().setScreen(new TitleScreen()), 9_400L);
+            schedule(() -> screenshot("detective-v041-22-title-entry.png"), 10_800L);
+            schedule(UiValidationPlan::complete, 11_800L);
         });
     }
 
@@ -367,6 +412,68 @@ public final class UiValidationPlan {
                         "create", "Create", "6.0.0", "6.0.2"),
                 new ModpackChangesViewModel.Change(ModpackChangesViewModel.Type.REMOVED,
                         "old_qol", "Old QoL", "1.4.1", "")));
+    }
+
+    private static void createRuntimeValidationReport(IncidentDetailViewModel incident) {
+        try {
+            SupportReportData data = new SupportReportData(
+                    "0.5.0-alpha.1",
+                    "1.21.1",
+                    "21.1.235",
+                    incident,
+                    List.of(new SupportReportData.InstalledMod(
+                            "detective", "Detective", "0.5.0-alpha.1", "detective.jar")),
+                    syntheticModpackChanges(),
+                    DetectiveSettings.defaults(),
+                    SupportReportData.Environment.capture());
+            Path report = SupportReportExporter.export(data, ModDetectivePaths.reports());
+            boolean noLog = true;
+            try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(report.toFile())) {
+                noLog = zip.stream().noneMatch(entry -> entry.getName().endsWith("latest.log"));
+            }
+            DetectiveTestCulprit.LOGGER.info(
+                    "[Detective Validation] SUPPORT_REPORT result={} file={} size={} latestLogIncluded={}",
+                    noLog ? "PASS" : "FAIL", report.getFileName(), Files.size(report), !noLog);
+        } catch (Exception error) {
+            DetectiveTestCulprit.LOGGER.error("[Detective Validation] SUPPORT_REPORT result=FAIL", error);
+        }
+    }
+
+    private static void showNotificationBurst(IncidentDetailViewModel detail) {
+        DetectiveSupportService.updateSettings(settings -> settings.withIncidentNotifications(true))
+                .whenComplete((settings, error) -> {
+                    if (error != null) {
+                        DetectiveTestCulprit.LOGGER.error(
+                                "[Detective Validation] Notification settings preparation failed", error);
+                        return;
+                    }
+                    FreezeIncident incident = notificationIncident(detail);
+                    for (int index = 0; index < 4; index++) {
+                        DetectiveSupportService.onIncidentRecorded(incident,
+                                ModDetectivePaths.incidents().resolve("validation-notification-" + index + ".json"));
+                    }
+                    DetectiveTestCulprit.LOGGER.info(
+                            "[Detective Validation] NOTIFICATION_BURST submitted=4; cooldown expectedVisible=1");
+                });
+    }
+
+    private static FreezeIncident notificationIncident(IncidentDetailViewModel detail) {
+        SuspectViewModel view = detail.suspects().getFirst();
+        SuspectAnalyzer.Suspect suspect = new SuspectAnalyzer.Suspect(
+                view.modId(), view.modName(), view.version(), view.presenceSamples(),
+                view.presenceSharePercent(), view.leafOwnershipCount(), view.leafOwnershipSharePercent(),
+                view.averageFirstFrameDepth(), view.minimumFirstFrameDepth(), view.repeatedLeafOwnership(),
+                view.callerOnlySamples(), view.stackDiversity());
+        FrameSample frame = new FrameSample(
+                System.currentTimeMillis(), System.nanoTime(), detail.summary().durationMs(), 1.6,
+                900L * 1024L * 1024L, 2L * 1024L * 1024L * 1024L,
+                detail.dimensionId(), 128, 64, -342);
+        return new FreezeIncident(
+                frame.epochMs(), frame.frameMs(), detail.summary().thresholdMs(), frame,
+                detail.summary().watchdogSamples(),
+                new AttributionEvidence(AttributionEvidence.State.ATTRIBUTED,
+                        detail.summary().watchdogSamples(), view.presenceSamples(), 0, 0),
+                List.of(suspect), List.of(), List.of(frame));
     }
 
     private static void screenshot(String fileName) {

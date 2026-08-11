@@ -13,6 +13,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.LongAdder;
+import java.util.function.BiConsumer;
 
 public final class FreezeDetector implements AutoCloseable {
     private static final int BASELINE_WINDOW = 180;
@@ -32,6 +33,7 @@ public final class FreezeDetector implements AutoCloseable {
     private final LongAdder processedIncidents = new LongAdder();
     private final LongAdder incidentProcessingNanos = new LongAdder();
     private final AtomicLong maximumIncidentProcessingNanos = new AtomicLong();
+    private final BiConsumer<FreezeIncident, Path> incidentRecordedListener;
 
     public FreezeDetector(BlackBoxRecorder blackBox, RenderThreadWatchdog watchdog, SuspectAnalyzer analyzer) {
         this(blackBox, watchdog, analyzer, false);
@@ -43,10 +45,22 @@ public final class FreezeDetector implements AutoCloseable {
             SuspectAnalyzer analyzer,
             boolean metricsEnabled
     ) {
+        this(blackBox, watchdog, analyzer, metricsEnabled, (incident, path) -> {});
+    }
+
+    public FreezeDetector(
+            BlackBoxRecorder blackBox,
+            RenderThreadWatchdog watchdog,
+            SuspectAnalyzer analyzer,
+            boolean metricsEnabled,
+            BiConsumer<FreezeIncident, Path> incidentRecordedListener
+    ) {
         this.blackBox = blackBox;
         this.watchdog = watchdog;
         this.analyzer = analyzer;
         this.metricsEnabled = metricsEnabled;
+        this.incidentRecordedListener = java.util.Objects.requireNonNull(
+                incidentRecordedListener, "incidentRecordedListener");
         this.incidentWorker = new ThreadPoolExecutor(
                 1,
                 1,
@@ -113,6 +127,11 @@ public final class FreezeDetector implements AutoCloseable {
 
             Path saved = IncidentStore.save(incident);
             logIncident(incident, saved);
+            try {
+                incidentRecordedListener.accept(incident, saved);
+            } catch (RuntimeException listenerFailure) {
+                ModDetective.LOGGER.warn("[Detective] Incident was saved, but post-save support handling failed", listenerFailure);
+            }
         } catch (IOException | RuntimeException e) {
             ModDetective.LOGGER.error("[Detective] Unable to analyze or save a freeze incident", e);
         } finally {

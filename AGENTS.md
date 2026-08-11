@@ -6,7 +6,7 @@ Detective is a client-side Minecraft diagnostic mod for Minecraft 1.21.1 using N
 The product goal is to help ordinary players identify which mod is probably responsible for freezes or performance regressions without requiring profiler expertise.
 
 ## Current milestone
-The current milestone is **v0.4 first usable client UI**. Preserve the validated v0.3.1 engine and keep the interface lightweight and vanilla-friendly.
+The current milestone is **v0.5 Support & Daily Use**. Preserve the validated v0.3.1 engine and the v0.4.1 investigation UI while adding local notifications, support-report export, essential settings, and bounded history retention.
 
 Preserve and make functional these subsystems:
 - mod/version snapshot and launch-to-launch diff
@@ -28,7 +28,7 @@ Preserve and make functional these subsystems:
 - If an existing implementation is invalid for NeoForge 1.21.1, replace it with the closest robust implementation and document the change.
 - Suspect scores are evidence, not proof. Avoid naming a mod as definitively guilty unless causality is actually established.
 - Keep runtime overhead low. Profiling must not itself create visible stutter.
-- Avoid network calls and telemetry in v0.4.
+- Avoid network calls and telemetry in v0.5. Standard support reports are local-only and never include `latest.log`.
 - Do not add third-party runtime dependencies unless clearly justified.
 - Keep persistent output under the Detective data directory and avoid touching unrelated player files.
 - Keep all controlled-freeze and validation code outside the public `main` source set.
@@ -50,5 +50,5 @@ At the end of each substantial task, report:
 - remaining risks/TODOs
 - any NeoForge API assumptions that still need runtime validation
 
-## Scope guard for v0.4
-Do not implement cloud services, automatic uploads, telemetry, monetization, Fabric support, public server profiling, 3D world localization, AI explanations, or a complex real-time overlay. Keep UI data adapters separate from the low-level engine.
+## Scope guard for v0.5
+Do not implement cloud services, automatic uploads, telemetry, accounts, monetization, Fabric support, public server profiling, 3D world localization, AI explanations, automatic mod/config changes, update services, full CPU profiling, or a complex real-time overlay. Keep support/report and UI adapters separate from the low-level engine.

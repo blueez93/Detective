@@ -8,11 +8,27 @@ public record IncidentDetailViewModel(
         List<SuspectViewModel> suspects,
         List<BlackBoxPoint> blackBox,
         int originalBlackBoxSamples,
-        boolean blackBoxPartial
+        boolean blackBoxPartial,
+        String dimensionId,
+        Integer playerX,
+        Integer playerY,
+        Integer playerZ
 ) {
     public IncidentDetailViewModel {
         summary = Objects.requireNonNull(summary, "summary");
         suspects = List.copyOf(Objects.requireNonNull(suspects, "suspects"));
         blackBox = List.copyOf(Objects.requireNonNull(blackBox, "blackBox"));
+        dimensionId = Objects.requireNonNullElse(dimensionId, "unknown");
+    }
+
+    public IncidentDetailViewModel(
+            IncidentSummaryViewModel summary,
+            List<SuspectViewModel> suspects,
+            List<BlackBoxPoint> blackBox,
+            int originalBlackBoxSamples,
+            boolean blackBoxPartial
+    ) {
+        this(summary, suspects, blackBox, originalBlackBoxSamples, blackBoxPartial,
+                summary.dimension(), null, null, null);
     }
 }

@@ -22,6 +22,14 @@ public final class ModDetectivePaths {
         return root().resolve("incidents");
     }
 
+    public static Path reports() {
+        return root().resolve("reports");
+    }
+
+    public static Path settings() {
+        return root().resolve("settings.json");
+    }
+
     public static synchronized void ensureDirectories() {
         try {
             Path gameDirectory = FMLPaths.GAMEDIR.get().toAbsolutePath().normalize();
@@ -33,6 +41,7 @@ public final class ModDetectivePaths {
             }
             Files.createDirectories(snapshots());
             Files.createDirectories(incidents());
+            Files.createDirectories(reports());
         } catch (IOException e) {
             throw new IllegalStateException("Unable to create Detective data directories", e);
         }

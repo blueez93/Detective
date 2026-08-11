@@ -2,6 +2,7 @@ package fr.apocalypsebleu.moddetective;
 
 import com.mojang.logging.LogUtils;
 import fr.apocalypsebleu.moddetective.snapshot.ModSnapshotService;
+import fr.apocalypsebleu.moddetective.client.support.DetectiveSupportService;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
@@ -20,6 +21,7 @@ public final class ModDetective {
 
     private void onClientSetup(FMLClientSetupEvent event) {
         event.enqueueWork(() -> {
+            DetectiveSupportService.initializeAsync();
             try {
                 var diff = ModSnapshotService.captureAndPersist();
                 LOGGER.info("[Detective] Ready: {} loaded mods, {} change(s) since the previous session",

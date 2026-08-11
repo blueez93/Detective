@@ -5,8 +5,8 @@
 
 Detective should turn technical profiling evidence into a clear, cautious investigation for normal Minecraft players and modpack maintainers. Detective finds the evidence; the player makes the call.
 
-## v0.4.1 scope — Investigation UI polish
-A lightweight, vanilla-friendly client interface over the validated v0.3.1 engine. It exposes persisted incidents, cautious evidence states, Black Box history, and launch-to-launch modpack changes without changing the production attribution algorithm. Product copy follows: “Detect. Measure. Explain. Never accuse.”
+## v0.5 scope — Support & Daily Use
+A local-only support workflow over the validated v0.3.1 engine and v0.4.1 investigation UI. A recorded incident can produce a privacy-previewed, versioned support ZIP; essential settings control notifications, bounded history retention, and the default evidence view. The production attribution algorithm remains unchanged. Product copy follows: “Detect. Measure. Explain. Never accuse.”
 
 ### Production subsystems
 - Snapshot: pack state and version changes.
@@ -18,10 +18,12 @@ A lightweight, vanilla-friendly client interface over the validated v0.3.1 engin
 - Attribution Evidence: explicit attributed/ambiguous/insufficient/GC/native-or-driver/unknown state without a fabricated culprit.
 - UI data layer: tolerant incident/modpack adapters, immutable view models, newest-first index, lazy detail loading, and a single low-priority bounded-lifecycle data worker.
 - Client UI: entry buttons on the title and pause screens, session summary, scrollable incident list, incident detail with a simple 2D Black Box graph, and modpack changes.
+- Daily-use support: cooldown-protected vanilla incident notifications, local support ZIP export, atomic settings, and count/age history retention.
+- Support report: UTF-8 human summaries plus schema-versioned allow-listed JSON. It excludes `latest.log`, personal paths, account/session data, server addresses, JARs, and all automatic upload behavior.
 
 ### v0.3.1 engine baseline
 - The immutable v0.3 and v0.3.1 measurements remain in `validation-pack/RESULTS-v0.3.md` and `validation-pack/RESULTS-v0.3.1.md`.
-- Production ranking remains leaf-ownership-first with presence as preserved evidence/fallback. v0.4 adds display tiers only; it does not tune detection, attribution, debounce, or confidence states.
+- Production ranking remains leaf-ownership-first with presence as preserved evidence/fallback. v0.4 added display tiers and v0.5 adds support workflows only; neither tunes detection, attribution, engine debounce, or confidence states.
 
 ### Development-only validation
 - Three source sets loaded as separate `detective_testculprit_a`, `_b`, and `_c` mods by `runClient` only.
@@ -35,7 +37,7 @@ A lightweight, vanilla-friendly client interface over the validated v0.3.1 engin
 - Development-only GC pressure runs off the render thread and emits monotonic/epoch markers for correlation with optional unified JVM GC logs.
 - Phase incident JSON is analyzed on validation workers, not the render thread.
 - The public JAR contains only `sourceSets.main`.
-- A v0.4 screenshot route opens the real pause menu, home, real incident list/detail, modpack changes, a synthetic empty list, and the title entry. Accessibility onboarding and the experimental-world confirmation are handled only in this development route.
+- The UI screenshot route covers the v0.4.1 investigation states plus v0.5 export preview/success, settings, clear-history confirmation, and notification cooldown. Accessibility onboarding and the experimental-world confirmation are handled only in this development route.
 
 ### v0.3.1 measured result
 - The immutable v0.3 baseline remains in `validation-pack/RESULTS-v0.3.md`.
@@ -53,21 +55,29 @@ A lightweight, vanilla-friendly client interface over the validated v0.3.1 engin
 - The final runtime route produced eight screenshots, including an attributed detail and its scrolled Black Box, and stopped the watchdog and integrated server cleanly. A chunk/world-entry stall before the route produced `INSUFFICIENT_EVIDENCE`; it is retained as an honest runtime observation rather than filtered for UI validation.
 - Detailed results are in `validation-pack/RESULTS-v0.4.md`.
 
+### v0.5 validation result
+- `clean build` and the separate test run pass with 71 tests (53 preserved and 18 new support/privacy tests).
+- The final realistic `runClient` loaded 21 mods on Minecraft 1.21.1 / NeoForge 21.1.235, captured all investigation/support screens in English and the long v0.5 layouts in French, produced a real 4.7 KiB support ZIP, and shut down cleanly.
+- A four-incident development burst displayed one cautious vanilla toast. Notification suppression is UX-only and does not modify detection or persistence.
+- The runtime ZIP contained ten allow-listed entries and eight valid schema-v1 JSON documents; it contained no `latest.log` or audited account/session/path/network identifiers.
+- The public `detective-0.5.0-alpha.1.jar` contains only `META-INF`, Detective assets, and `fr.apocalypsebleu.moddetective` classes. Detailed results are in `RESULTS-v0.5.md`.
+
 ## Compatibility note
 The public mod id and data directory changed from `moddetective` to `detective` in v0.2. Existing data is moved when possible; conflicts are retained in the legacy directory instead of being overwritten. The Java package remains `fr.apocalypsebleu.moddetective` to avoid a risky package-wide migration during engine validation.
 
-## Non-goals for v0.4
+## Non-goals for v0.5
 - Exact GPU profiling.
 - Server TPS profiling.
 - Automatic disabling of mods.
 - Claiming causal certainty.
-- Cloud uploads or telemetry.
-- Final visual polish, complex real-time overlay, or advanced export.
+- Cloud uploads, accounts, telemetry, analytics, or update checks.
+- Automatic `latest.log` inclusion, JVM dumps, screenshots, JARs, saves, or large diagnostics.
+- Final visual polish, complex real-time overlay, advanced export, automatic mod/config changes, or AI diagnosis.
 
 ## Future differentiators
 - Compare regressions between launches.
 - Config-file change tracking.
-- One-click support report.
+- Optional, explicitly warned Minecraft-log attachment.
 - Location-aware block/entity suspects.
 - Friendly explanations instead of raw flamegraphs.
 - Optional server companion module later.

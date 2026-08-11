@@ -41,6 +41,12 @@ public final class DetectiveUiService {
         }
     }
 
+    public static void invalidateIndex() {
+        synchronized (LOCK) {
+            cachedIndex = null;
+        }
+    }
+
     public static CompletableFuture<IncidentDetailViewModel> loadDetail(Path source) {
         return CompletableFuture.supplyAsync(() -> {
             try {

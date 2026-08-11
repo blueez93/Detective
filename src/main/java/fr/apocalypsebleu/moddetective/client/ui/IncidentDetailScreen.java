@@ -1,6 +1,7 @@
 package fr.apocalypsebleu.moddetective.client.ui;
 
 import fr.apocalypsebleu.moddetective.client.ui.data.DetectiveUiService;
+import fr.apocalypsebleu.moddetective.client.support.DetectiveSupportService;
 import fr.apocalypsebleu.moddetective.client.ui.model.BlackBoxPoint;
 import fr.apocalypsebleu.moddetective.client.ui.model.EvidenceBadge;
 import fr.apocalypsebleu.moddetective.client.ui.model.IncidentDetailViewModel;
@@ -33,6 +34,8 @@ public final class IncidentDetailScreen extends Screen {
     private int technicalActionX;
     private int technicalActionY;
     private int technicalActionWidth;
+    private boolean scrollToTechnicalPending;
+    private int technicalSectionOffset;
 
     public IncidentDetailScreen(Screen parent, IncidentSummaryViewModel summary) {
         this(parent, summary, null);
@@ -56,9 +59,21 @@ public final class IncidentDetailScreen extends Screen {
 
     @Override
     protected void init() {
+        int actionWidth = Math.min(400, this.width - 16);
+        int backWidth = 90;
+        int gap = 4;
+        int exportWidth = actionWidth - backWidth - gap;
+        int actionLeft = (this.width - actionWidth) / 2;
+        this.addRenderableWidget(Button.builder(
+                        Component.translatable("detective.ui.export.button"),
+                        button -> this.minecraft.setScreen(new ExportSupportReportScreen(this, summary)))
+                .bounds(actionLeft, this.height - 28, exportWidth, 20)
+                .build()).active = preloadedDetail == null;
         this.addRenderableWidget(Button.builder(CommonComponents.GUI_BACK, button -> onClose())
-                .bounds(this.width / 2 - 50, this.height - 28, 100, 20)
+                .bounds(actionLeft + exportWidth + gap, this.height - 28, backWidth, 20)
                 .build());
+        scrollToTechnicalPending = preloadedDetail == null
+                && DetectiveSupportService.settings().showTechnicalEvidenceByDefault();
         if (preloadedDetail != null) {
             detail = preloadedDetail;
             loading = false;
@@ -109,11 +124,16 @@ public final class IncidentDetailScreen extends Screen {
             y = renderOtherSuspects(graphics, left, y, width) + 8;
         }
         y = renderBlackBox(graphics, left, y, width) + 8;
+        technicalSectionOffset = y - startY;
         y = renderTechnicalEvidence(graphics, left, y, width, mouseX, mouseY) + 8;
         graphics.disableScissor();
 
         contentHeight = y - startY;
         scrollOffset = Mth.clamp(scrollOffset, 0.0, maximumScroll());
+        if (scrollToTechnicalPending) {
+            scrollOffset = Mth.clamp(technicalSectionOffset, 0.0, maximumScroll());
+            scrollToTechnicalPending = false;
+        }
         if (pendingTooltip != null) {
             graphics.renderTooltip(this.font, this.font.split(pendingTooltip, Math.min(300, this.width - 32)),
                     mouseX, mouseY);

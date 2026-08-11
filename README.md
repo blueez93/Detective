@@ -1,4 +1,4 @@
-# Detective — v0.4.1 Investigation UI Polish
+# Detective — v0.5.0-alpha.1 Support & Daily Use
 
 Minecraft 1.21.1 / NeoForge 21.1.235 / Java 21.
 
@@ -19,7 +19,7 @@ Its product-copy rule is: **Detect. Measure. Explain. Never accuse.**
 - Processes incidents on a bounded worker queue and atomically stores JSON under `<game directory>/detective/incidents/`.
 - Performs no network calls or telemetry and is not required on a server.
 
-The internal Java package remains `fr.apocalypsebleu.moddetective` for v0.4 to avoid a high-risk package-only rename. The public mod id, artifact, display name, assets, logs, and data directory are all `detective`/`Detective`.
+The internal Java package remains `fr.apocalypsebleu.moddetective` to avoid a high-risk package-only rename. The public mod id, artifact, display name, assets, logs, and data directory are all `detective`/`Detective`.
 
 ## Legacy data migration
 
@@ -33,9 +33,19 @@ Detective adds a client-only button to the top-right of both the Minecraft title
 - a newest-first scrollable incident list with duration, evidence badge, date, dimension, and compact coordinates;
 - a scrollable incident detail with duration/threshold/context, primary and other suspects, raw evidence metrics, and a peak-preserving 2D Black Box frametime graph;
 - a modpack changes screen for added, removed, and updated mods since the previous launch;
+- a local Support Report flow with a privacy preview, current/latest incident selection, and Open Folder confirmation;
+- essential settings for incident notifications, history count/age retention, and the default technical-evidence view;
 - explicit empty and degraded states for missing files, partial Black Box data, no suspect, ambiguous attribution, insufficient evidence, JVM/GC, native/driver, and unknown cases.
 
 Screens consume immutable UI view models rather than engine records. Incident indexing and JSON parsing run once on a low-priority client data worker when the UI opens; summaries skip Black Box arrays while streaming, and a full incident is loaded lazily only for its detail screen. No parsing is performed every render frame.
+
+## Support reports and privacy
+
+`Export Support Report` creates a small local ZIP under `<game directory>/detective/reports`. The ZIP contains a human-readable README/summary and schema-versioned JSON for the selected incident, installed mod metadata, modpack changes, Detective settings, and basic JVM/system information. It is assembled from an explicit allow-list and never uploads itself.
+
+The standard report does not include `latest.log`, JARs, saves, screenshots, memory dumps, Minecraft account/session identifiers, Windows account/host names, personal paths, IP/server addresses, or network-derived data. Missing snapshots, suspects, coordinates, and partial Black Box history are represented explicitly instead of failing the whole export.
+
+Incident JSON history is bounded by both configured count and age (defaults: 50 incidents and 30 days). `Clear Incident History` removes only Detective incident records under the Detective data directory.
 
 ## Development validation harness
 
@@ -115,7 +125,7 @@ The focused multi-culprit matrix can be repeated independently with `-Pdetective
 
 The nine-shape stack study uses `-PdetectiveValidationAutorun=evidence`; the isolated focus continuity replay uses `-PdetectiveValidationAutorun=focus`. Add `-PdetectiveValidationGcLogging=true` to a GC or real-world run to create a local unified JVM log, and optionally tune `detectiveValidationGcPressureMiB` and `detectiveValidationGcPasses`. These settings and all pressure code remain development-only.
 
-The development-only v0.4 screen route uses an existing world and writes local screenshots under `run/client/screenshots`:
+The development-only UI route covers v0.4.1 investigation screens and v0.5 support/settings states, and writes local screenshots under `run/client/screenshots`:
 
 ```powershell
 .\gradlew.bat runClient --no-daemon -PdetectiveValidationWorld=DetectiveValidation -PdetectiveValidationAutorun=ui -PdetectiveValidationExit=true
@@ -128,6 +138,8 @@ During a development run, inspect:
 - `run/client/logs/latest.log` for `[Detective]` and `[Detective Validation]`;
 - `run/client/detective/snapshots/last-session.json`;
 - `run/client/detective/incidents/*.json`;
+- `run/client/detective/settings.json`;
+- `run/client/detective/reports/detective-report-*.zip`;
 - `run/client/detective-validation/ground-truth.jsonl`.
 - `run/client/detective-validation/overhead-metrics.jsonl`;
 - `run/client/detective-validation/phase-results.jsonl`;
@@ -136,4 +148,4 @@ During a development run, inspect:
 
 ## Scope
 
-v0.4 provides the first stable, usable UI over the validated engine. It deliberately excludes final visual polish, complex live overlays, advanced exports, cloud uploads, telemetry, server profiling, Fabric support, 3D world localization, monetization, update services, and natural-language diagnosis.
+v0.5 adds local notifications, a privacy-conscious support ZIP, essential settings, and bounded retention over the validated engine/UI. It deliberately excludes log attachment, cloud uploads, accounts, telemetry, server profiling, Fabric support, automatic mod/config changes, auto-update, full CPU profiling, crash dumps, and natural-language diagnosis.

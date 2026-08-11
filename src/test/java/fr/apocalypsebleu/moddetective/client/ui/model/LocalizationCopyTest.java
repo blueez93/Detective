@@ -28,6 +28,12 @@ class LocalizationCopyTest {
         assertEquals("POSSIBLE SYSTEM STALL", english.get("detective.ui.evidence.system"));
         assertEquals("Partial Black Box data",
                 english.get("detective.ui.incident.black_box.partial.title"));
+        assertEquals("EXPORT SUPPORT REPORT", english.get("detective.ui.export.title"));
+        assertEquals("Nothing will be uploaded automatically.",
+                english.get("detective.ui.export.local_only"));
+        assertEquals("DETECTIVE SETTINGS", english.get("detective.ui.settings.title"));
+        assertEquals("No reliable mod attribution",
+                english.get("detective.notification.unattributed"));
     }
 
     @Test

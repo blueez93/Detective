@@ -9,6 +9,7 @@ import fr.apocalypsebleu.moddetective.core.RenderThreadWatchdog;
 import fr.apocalypsebleu.moddetective.core.SuspectAnalyzer;
 import fr.apocalypsebleu.moddetective.core.SamplingContinuityGate;
 import fr.apocalypsebleu.moddetective.client.ui.data.DetectiveUiService;
+import fr.apocalypsebleu.moddetective.client.support.DetectiveSupportService;
 import net.minecraft.client.Minecraft;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -25,11 +26,13 @@ public final class ClientPerformanceEvents {
     private static final BlackBoxRecorder BLACK_BOX = new BlackBoxRecorder();
     private static final RenderThreadWatchdog WATCHDOG = new RenderThreadWatchdog(DEVELOPMENT_METRICS);
     private static final FreezeDetector FREEZE_DETECTOR = new FreezeDetector(
-            BLACK_BOX, WATCHDOG, new SuspectAnalyzer(), DEVELOPMENT_METRICS);
+            BLACK_BOX, WATCHDOG, new SuspectAnalyzer(), DEVELOPMENT_METRICS,
+            DetectiveSupportService::onIncidentRecorded);
     private static final SamplingContinuityGate CONTINUITY_GATE = new SamplingContinuityGate();
 
     private static boolean watchdogStartAttempted;
     private static boolean gameplayActive;
+    private static boolean shuttingDown;
     private static long previousFrameNanos;
     private static long lastFailureLogNanos = Long.MIN_VALUE;
 
@@ -37,6 +40,9 @@ public final class ClientPerformanceEvents {
 
     @SubscribeEvent
     public static void onRenderFramePost(RenderFrameEvent.Post event) {
+        if (shuttingDown) {
+            return;
+        }
         long nowNanos = System.nanoTime();
 
         try {
@@ -139,8 +145,10 @@ public final class ClientPerformanceEvents {
 
     @SubscribeEvent
     public static void onGameShuttingDown(GameShuttingDownEvent event) {
+        shuttingDown = true;
         WATCHDOG.stop();
         FREEZE_DETECTOR.close();
+        DetectiveSupportService.shutdown();
         DetectiveUiService.shutdown();
     }
 }

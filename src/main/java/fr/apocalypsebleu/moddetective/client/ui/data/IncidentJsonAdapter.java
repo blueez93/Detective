@@ -41,7 +41,11 @@ public final class IncidentJsonAdapter {
                 parsed.suspects(),
                 downsample(points, MAX_GRAPH_POINTS),
                 originalSamples,
-                partial);
+                partial,
+                parsed.dimensionId(),
+                parsed.playerX(),
+                parsed.playerY(),
+                parsed.playerZ());
     }
 
     private static ParsedIncident parse(Path source, boolean includeBlackBox) throws IOException {
@@ -79,7 +83,7 @@ public final class IncidentJsonAdapter {
                 UiFormatters.dateTime(detectedAt),
                 UiFormatters.dimension(rawDimension),
                 UiFormatters.coordinates(x, y, z));
-        return new ParsedIncident(root, summary, suspects);
+        return new ParsedIncident(root, summary, suspects, rawDimension, x, y, z);
     }
 
     private static JsonObject readRoot(Path source, boolean includeBlackBox) throws IOException {
@@ -236,5 +240,13 @@ public final class IncidentJsonAdapter {
         }
     }
 
-    private record ParsedIncident(JsonObject root, IncidentSummaryViewModel summary, List<SuspectViewModel> suspects) {}
+    private record ParsedIncident(
+            JsonObject root,
+            IncidentSummaryViewModel summary,
+            List<SuspectViewModel> suspects,
+            String dimensionId,
+            Integer playerX,
+            Integer playerY,
+            Integer playerZ
+    ) {}
 }

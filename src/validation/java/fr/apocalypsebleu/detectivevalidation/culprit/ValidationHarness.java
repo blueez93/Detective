@@ -35,7 +35,7 @@ public final class ValidationHarness {
     private static final Gson GSON = new Gson();
     private static final long POSITIVE_TIMEOUT_MS = 8_000L;
     private static final long NEGATIVE_OBSERVATION_MS = 3_000L;
-    private static final int MAX_SCHEDULED_ACTIONS = 64;
+    private static final int MAX_SCHEDULED_ACTIONS = 128;
     private static final Object GROUND_TRUTH_LOCK = new Object();
     private static final Object METRICS_LOCK = new Object();
 

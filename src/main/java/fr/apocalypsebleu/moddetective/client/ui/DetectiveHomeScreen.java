@@ -19,6 +19,7 @@ public final class DetectiveHomeScreen extends Screen {
     private boolean loading = true;
     private boolean loadFailed;
     private Button lastIncidentButton;
+    private Button exportButton;
     private double scrollOffset;
     private int contentHeight;
 
@@ -45,7 +46,7 @@ public final class DetectiveHomeScreen extends Screen {
         int left = (this.width - contentWidth) / 2;
         int gap = 4;
         int buttonWidth = (contentWidth - gap * 2) / 3;
-        int navigationY = this.height - DetectiveUiRenderer.FOOTER_HEIGHT - 24;
+        int navigationY = this.height - DetectiveUiRenderer.FOOTER_HEIGHT - 48;
 
         this.addRenderableWidget(Button.builder(
                         Component.translatable("detective.ui.home.incidents"),
@@ -62,6 +63,18 @@ public final class DetectiveHomeScreen extends Screen {
                         Component.translatable("detective.ui.home.modpack_changes"),
                         button -> this.minecraft.setScreen(new ModpackChangesScreen(this)))
                 .bounds(left + (buttonWidth + gap) * 2, navigationY, buttonWidth, 20)
+                .build());
+        int secondaryButtonWidth = (contentWidth - gap) / 2;
+        this.exportButton = this.addRenderableWidget(Button.builder(
+                        Component.translatable("detective.ui.home.export"),
+                        button -> exportLastIncident())
+                .bounds(left, navigationY + 24, secondaryButtonWidth, 20)
+                .build());
+        this.exportButton.active = index != null && index.summary().lastIncident() != null;
+        this.addRenderableWidget(Button.builder(
+                        Component.translatable("detective.ui.home.settings"),
+                        button -> this.minecraft.setScreen(new DetectiveSettingsScreen(this)))
+                .bounds(left + secondaryButtonWidth + gap, navigationY + 24, secondaryButtonWidth, 20)
                 .build());
         this.addRenderableWidget(Button.builder(CommonComponents.GUI_BACK, button -> onClose())
                 .bounds(this.width / 2 - 50, this.height - 28, 100, 20)
@@ -85,12 +98,21 @@ public final class DetectiveHomeScreen extends Screen {
             if (lastIncidentButton != null) {
                 lastIncidentButton.active = index != null && index.summary().lastIncident() != null;
             }
+            if (exportButton != null) {
+                exportButton.active = index != null && index.summary().lastIncident() != null;
+            }
         }));
     }
 
     private void openLastIncident() {
         if (index != null && index.summary().lastIncident() != null) {
             this.minecraft.setScreen(new IncidentDetailScreen(this, index.summary().lastIncident()));
+        }
+    }
+
+    private void exportLastIncident() {
+        if (index != null && index.summary().lastIncident() != null) {
+            this.minecraft.setScreen(new ExportSupportReportScreen(this, index.summary().lastIncident()));
         }
     }
 
@@ -104,7 +126,7 @@ public final class DetectiveHomeScreen extends Screen {
 
         int contentWidth = Math.min(440, this.width - 24);
         int left = (this.width - contentWidth) / 2;
-        int navigationY = this.height - DetectiveUiRenderer.FOOTER_HEIGHT - 24;
+        int navigationY = this.height - DetectiveUiRenderer.FOOTER_HEIGHT - 48;
         int statusY = DetectiveUiRenderer.HEADER_HEIGHT + 8;
         int contentY = statusY - (int) scrollOffset;
         int statusHeight = 88;
@@ -198,7 +220,7 @@ public final class DetectiveHomeScreen extends Screen {
 
     private double maximumScroll() {
         int statusY = DetectiveUiRenderer.HEADER_HEIGHT + 8;
-        int navigationY = this.height - DetectiveUiRenderer.FOOTER_HEIGHT - 24;
+        int navigationY = this.height - DetectiveUiRenderer.FOOTER_HEIGHT - 48;
         int viewportHeight = Math.max(1, navigationY - 3 - statusY);
         return Math.max(0, contentHeight - viewportHeight);
     }
