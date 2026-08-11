@@ -13,9 +13,11 @@ public record EngineMetricsSnapshot(
         int retainedWatchdogFrames,
         int blackBoxSamples,
         int incidentWorkerQueueSize,
+        int maximumIncidentWorkerQueueSize,
         int incidentWorkerQueueCapacity,
         long droppedIncidents,
         long processedIncidents,
         double averageIncidentProcessingMs,
+        double p95IncidentProcessingMs,
         double maximumIncidentProcessingMs
 ) {}

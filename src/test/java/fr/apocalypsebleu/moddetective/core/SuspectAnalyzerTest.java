@@ -98,6 +98,23 @@ class SuspectAnalyzerTest {
         assertTrue(analysis.hotClasses().isEmpty());
     }
 
+    @Test
+    void preservesSharedOwnershipAndDoesNotInventAnOwnerForUnknownClasses() {
+        ModSourceResolver.ResolvedMod shared = new ModSourceResolver.ResolvedMod(
+                "alpha+beta", "Alpha / Beta (shared mod file)", "1.0");
+        SuspectAnalyzer analyzer = new SuspectAnalyzer(className -> switch (className) {
+            case "example.shared.Work" -> Optional.of(shared);
+            default -> Optional.empty();
+        });
+
+        SuspectAnalyzer.Analysis analysis = analyzer.analyze(List.of(
+                stack(1L, "example.unknown.Work", "example.shared.Work")));
+
+        assertEquals(1, analysis.suspects().size());
+        assertEquals("alpha+beta", analysis.suspects().getFirst().modId());
+        assertEquals("Alpha / Beta (shared mod file)", analysis.suspects().getFirst().modName());
+    }
+
     private static ModSourceResolver.ResolvedMod mod(String id) {
         return new ModSourceResolver.ResolvedMod(id, id, "1.0");
     }

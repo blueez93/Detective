@@ -15,7 +15,7 @@ public final class SamplingContinuityGate {
 
     public boolean shouldRecord(boolean samplingAllowed) {
         if (!samplingAllowed) {
-            stabilizationFramesRemaining = RESUME_STABILIZATION_FRAMES;
+            markDiscontinuity();
             return false;
         }
         if (stabilizationFramesRemaining > 0) {
@@ -23,5 +23,14 @@ public final class SamplingContinuityGate {
             return false;
         }
         return true;
+    }
+
+    /**
+     * Marks a render discontinuity even when Minecraft produced no inactive frame for the gate
+     * to observe. This happens, for example, when an unfocused or minimized window renders no
+     * frames at all and the first observable interval is therefore unusably long.
+     */
+    public void markDiscontinuity() {
+        stabilizationFramesRemaining = RESUME_STABILIZATION_FRAMES;
     }
 }

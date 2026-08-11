@@ -14,7 +14,7 @@ Detective detects and measures Minecraft performance stalls, then presents cauti
 [[dependencies.${mod_id}]]
 modId="neoforge"
 type="required"
-versionRange="[${neo_version},)"
+versionRange="[${neo_min_version},)"
 ordering="NONE"
 side="CLIENT"
 

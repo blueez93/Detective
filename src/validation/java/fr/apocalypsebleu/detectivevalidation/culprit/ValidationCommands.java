@@ -2,6 +2,9 @@ package fr.apocalypsebleu.detectivevalidation.culprit;
 
 import com.mojang.brigadier.context.CommandContext;
 import fr.apocalypsebleu.moddetective.client.ClientPerformanceEvents;
+import fr.apocalypsebleu.moddetective.client.support.DetectiveSupportService;
+import fr.apocalypsebleu.moddetective.client.ui.DetectiveHomeScreen;
+import fr.apocalypsebleu.moddetective.client.ui.data.DetectiveUiService;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.ConnectScreen;
 import net.minecraft.client.gui.screens.PauseScreen;
@@ -23,6 +26,9 @@ import fr.apocalypsebleu.detectivevalidation.culpritb.IndependentStallTaskB;
 import fr.apocalypsebleu.detectivevalidation.culpritc.IndependentStallTaskC;
 
 import java.util.Set;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Comparator;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -74,6 +80,7 @@ public final class ValidationCommands {
 
     @SubscribeEvent
     public static void onClientTickPost(ClientTickEvent.Post event) {
+        LifecycleCyclePlan.tick();
         if (AUTORUN_SCENARIO.isEmpty() || autorunTriggered) {
             return;
         }
@@ -110,6 +117,8 @@ public final class ValidationCommands {
             case "evidence" -> scheduleEvidenceStudy();
             case "gc" -> scheduleGcStudy();
             case "focus" -> scheduleFocusStudy();
+            case "compatibility" -> scheduleCompatibilityCheckpoint();
+            case "lifecycle20" -> LifecycleCyclePlan.start();
             case "ui" -> UiValidationPlan.start(true) || UiValidationPlan.isRunning();
             case "realworld" -> RealWorldValidationPlan.start();
             default -> false;
@@ -124,6 +133,8 @@ public final class ValidationCommands {
                     case "evidence" -> 55_000L;
                     case "gc" -> 45_000L;
                     case "focus" -> 25_000L;
+                    case "compatibility" -> 24_000L;
+                    case "lifecycle20" -> 180_000L;
                     case "ui" -> 80_000L;
                     default -> 12_000L;
                 };
@@ -358,6 +369,58 @@ public final class ValidationCommands {
             PLAN_RUNNING.set(false);
         }, 35_000L);
         return true;
+    }
+
+    private static boolean scheduleCompatibilityCheckpoint() {
+        if (!PLAN_RUNNING.compareAndSet(false, true)) {
+            return false;
+        }
+        Set<Path> before = ValidationHarness.captureExistingReports();
+        schedule(RealWorldValidationPlan::focusWindow, 0L);
+        schedule(() -> runStall("compatibility-direct-a", 600L, true,
+                ControlledFreezeGenerator.Path.DIRECT_A, 1), 6_000L);
+        schedule(() -> exportNewestCompatibilityIncident(before), 11_000L);
+        schedule(() -> DetectiveUiService.refreshIndex().whenComplete((index, error) ->
+                Minecraft.getInstance().execute(() -> {
+                    if (error != null) {
+                        DetectiveTestCulprit.LOGGER.error(
+                                "[Detective Validation] COMPATIBILITY_UI result=FAIL", error);
+                    } else {
+                        Minecraft minecraft = Minecraft.getInstance();
+                        minecraft.setScreen(new DetectiveHomeScreen(minecraft.screen, index));
+                        DetectiveTestCulprit.LOGGER.info(
+                                "[Detective Validation] COMPATIBILITY_UI result=PASS incidents={}",
+                                index.incidents().size());
+                    }
+                })), 14_000L);
+        schedule(() -> {
+            ValidationHarness.logMetrics();
+            PLAN_RUNNING.set(false);
+        }, 18_000L);
+        return true;
+    }
+
+    private static void exportNewestCompatibilityIncident(Set<Path> before) {
+        Path newest = ValidationHarness.captureExistingReports().stream()
+                .filter(path -> !before.contains(path))
+                .filter(Files::isRegularFile)
+                .max(Comparator.comparing(path -> path.getFileName().toString()))
+                .orElse(null);
+        if (newest == null) {
+            DetectiveTestCulprit.LOGGER.error(
+                    "[Detective Validation] COMPATIBILITY_REPORT result=FAIL reason=no-new-incident");
+            return;
+        }
+        DetectiveSupportService.exportSupportReport(newest).whenComplete((report, error) -> {
+            if (error != null) {
+                DetectiveTestCulprit.LOGGER.error(
+                        "[Detective Validation] COMPATIBILITY_REPORT result=FAIL", error);
+            } else {
+                DetectiveTestCulprit.LOGGER.info(
+                        "[Detective Validation] COMPATIBILITY_REPORT result=PASS file={}",
+                        report.getFileName());
+            }
+        });
     }
 
     private static int runFocusStudy(CommandContext<CommandSourceStack> context) {

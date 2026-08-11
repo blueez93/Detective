@@ -1,6 +1,6 @@
-# Detective — v0.5.0-alpha.1 Support & Daily Use
+# Detective — v0.6.0-alpha.1 Release Hardening
 
-Minecraft 1.21.1 / NeoForge 21.1.235 / Java 21.
+Minecraft 1.21.1 / Java 21 / NeoForge 21.1.235 minimum, 21.1.248 recommended.
 
 Detective is a client-only diagnostic mod that records evidence around render-thread freezes and ranks the non-vanilla mods observed in watchdog stack samples. A suspect score is evidence, not proof of causality.
 
@@ -94,6 +94,7 @@ Development metrics are appended every five seconds to `overhead-metrics.jsonl`,
 
 See `validation-pack/README.md` for exact versions, licenses, selection rationale, and the 30-minute validation procedure.
 The immutable v0.3 baseline is in `validation-pack/RESULTS-v0.3.md`; v0.3.1 comparisons, GC correlation, stack evidence, and limitations are in `validation-pack/RESULTS-v0.3.1.md`.
+Release-hardening evidence is in `RESULTS-v0.6.md`, `COMPATIBILITY-v0.6.md`, `PERFORMANCE-v0.6.md`, and `MANUAL-TEST-CHECKLIST-v0.6.md`.
 
 ## Build and test
 
@@ -123,6 +124,8 @@ It waits for a loaded world and at least 60 Black Box frames, then covers stable
 
 The focused multi-culprit matrix can be repeated independently with `-PdetectiveValidationAutorun=attribution` and `-PdetectiveValidationExit=true`.
 
+The dedicated 20-cycle connection test uses `-PdetectiveValidationServer=127.0.0.1 -PdetectiveValidationAutorun=lifecycle20 -PdetectiveValidationExit=true`. It waits for the previous connection to close fully before each reconnect.
+
 The nine-shape stack study uses `-PdetectiveValidationAutorun=evidence`; the isolated focus continuity replay uses `-PdetectiveValidationAutorun=focus`. Add `-PdetectiveValidationGcLogging=true` to a GC or real-world run to create a local unified JVM log, and optionally tune `detectiveValidationGcPressureMiB` and `detectiveValidationGcPasses`. These settings and all pressure code remain development-only.
 
 The development-only UI route covers v0.4.1 investigation screens and v0.5 support/settings states, and writes local screenshots under `run/client/screenshots`:
@@ -148,4 +151,6 @@ During a development run, inspect:
 
 ## Scope
 
-v0.5 adds local notifications, a privacy-conscious support ZIP, essential settings, and bounded retention over the validated engine/UI. It deliberately excludes log attachment, cloud uploads, accounts, telemetry, server profiling, Fabric support, automatic mod/config changes, auto-update, full CPU profiling, crash dumps, and natural-language diagnosis.
+v0.6 hardens the existing engine/UI/support workflow through compatibility, corruption, privacy, performance and lifecycle validation. It adds no major user feature and deliberately excludes log attachment, cloud uploads, accounts, telemetry, server profiling, Fabric support, automatic mod/config changes, auto-update, full CPU profiling, crash dumps, and natural-language diagnosis.
+
+The automated Small Pack/loader/JAR checks pass, but this repository does not claim public-release readiness yet: Medium/Large/Stress packs, a cumulative 140-minute soak and the physical UI/focus/RAM/FPS matrix remain required. See the v0.6 manual checklist and NO-GO rationale before publishing.

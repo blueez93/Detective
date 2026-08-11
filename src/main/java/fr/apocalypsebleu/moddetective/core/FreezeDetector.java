@@ -12,6 +12,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.function.BiConsumer;
 
@@ -21,6 +22,7 @@ public final class FreezeDetector implements AutoCloseable {
     private static final double MAX_BASELINE_FRAME_MS = FreezeThreshold.ABSOLUTE_MINIMUM_MS;
     private static final long INCIDENT_DEBOUNCE_MS = 2_000L;
     private static final int INCIDENT_QUEUE_CAPACITY = 8;
+    private static final int INCIDENT_LATENCY_WINDOW_SAMPLES = 4_096;
 
     private final Deque<Double> recentFrames = new ArrayDeque<>();
     private final BlackBoxRecorder blackBox;
@@ -33,6 +35,8 @@ public final class FreezeDetector implements AutoCloseable {
     private final LongAdder processedIncidents = new LongAdder();
     private final LongAdder incidentProcessingNanos = new LongAdder();
     private final AtomicLong maximumIncidentProcessingNanos = new AtomicLong();
+    private final AtomicInteger maximumIncidentQueueSize = new AtomicInteger();
+    private final RollingLatencyStatistics incidentLatencyWindow;
     private final BiConsumer<FreezeIncident, Path> incidentRecordedListener;
 
     public FreezeDetector(BlackBoxRecorder blackBox, RenderThreadWatchdog watchdog, SuspectAnalyzer analyzer) {
@@ -59,6 +63,9 @@ public final class FreezeDetector implements AutoCloseable {
         this.watchdog = watchdog;
         this.analyzer = analyzer;
         this.metricsEnabled = metricsEnabled;
+        this.incidentLatencyWindow = metricsEnabled
+                ? new RollingLatencyStatistics(INCIDENT_LATENCY_WINDOW_SAMPLES)
+                : null;
         this.incidentRecordedListener = java.util.Objects.requireNonNull(
                 incidentRecordedListener, "incidentRecordedListener");
         this.incidentWorker = new ThreadPoolExecutor(
@@ -103,6 +110,7 @@ public final class FreezeDetector implements AutoCloseable {
     private void submitIncident(FrameSample frame, double threshold, List<StackSnapshot> stacks, List<FrameSample> history) {
         try {
             incidentWorker.execute(() -> processIncident(frame, threshold, stacks, history));
+            maximumIncidentQueueSize.accumulateAndGet(incidentWorker.getQueue().size(), Math::max);
         } catch (RejectedExecutionException e) {
             droppedIncidents.increment();
             ModDetective.LOGGER.warn("[Detective] Incident processing queue is full or shutting down; report dropped");
@@ -140,6 +148,7 @@ public final class FreezeDetector implements AutoCloseable {
                 processedIncidents.increment();
                 incidentProcessingNanos.add(elapsed);
                 maximumIncidentProcessingNanos.accumulateAndGet(elapsed, Math::max);
+                incidentLatencyWindow.record(elapsed);
             }
         }
     }
@@ -174,21 +183,28 @@ public final class FreezeDetector implements AutoCloseable {
     public Metrics metrics() {
         long processed = processedIncidents.sum();
         long totalNanos = incidentProcessingNanos.sum();
+        RollingLatencyStatistics.Snapshot latency = metricsEnabled
+                ? incidentLatencyWindow.snapshot()
+                : new RollingLatencyStatistics.Snapshot(0, 0L, 0L, 0L);
         return new Metrics(
                 incidentWorker.getQueue().size(),
+                maximumIncidentQueueSize.get(),
                 INCIDENT_QUEUE_CAPACITY,
                 droppedIncidents.sum(),
                 processed,
                 processed == 0L ? 0.0 : totalNanos / (double) processed / 1_000_000.0,
+                latency.p95Nanos() / 1_000_000.0,
                 maximumIncidentProcessingNanos.get() / 1_000_000.0);
     }
 
     public record Metrics(
             int queueSize,
+            int maximumQueueSize,
             int queueCapacity,
             long droppedIncidents,
             long processedIncidents,
             double averageProcessingMs,
+            double p95ProcessingMs,
             double maximumProcessingMs
     ) {}
 

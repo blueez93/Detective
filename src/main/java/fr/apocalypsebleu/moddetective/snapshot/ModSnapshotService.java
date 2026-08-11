@@ -16,6 +16,7 @@ import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
@@ -75,7 +76,7 @@ public final class ModSnapshotService {
         }
     }
 
-    private static ModSnapshot readPrevious(Path target) {
+    static ModSnapshot readPrevious(Path target) {
         if (!Files.isRegularFile(target)) {
             return null;
         }
@@ -84,10 +85,23 @@ public final class ModSnapshotService {
             if (snapshot == null) {
                 throw new IllegalArgumentException("Snapshot JSON contained null");
             }
+            validate(snapshot);
             return snapshot;
         } catch (Exception e) {
             ModDetective.LOGGER.warn("[Detective] Unable to read the previous snapshot; treating this as the first run", e);
             return null;
+        }
+    }
+
+    private static void validate(ModSnapshot snapshot) {
+        HashSet<String> ids = new HashSet<>();
+        for (ModSnapshot.LoadedMod mod : snapshot.mods()) {
+            if (mod.id().isBlank() || mod.version().isBlank()) {
+                throw new IllegalArgumentException("Snapshot contains a mod with an empty id or version");
+            }
+            if (!ids.add(mod.id())) {
+                throw new IllegalArgumentException("Snapshot contains duplicate mod id: " + mod.id());
+            }
         }
     }
 

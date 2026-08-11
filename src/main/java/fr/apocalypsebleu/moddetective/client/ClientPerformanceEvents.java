@@ -4,6 +4,7 @@ import fr.apocalypsebleu.moddetective.ModDetective;
 import fr.apocalypsebleu.moddetective.core.BlackBoxRecorder;
 import fr.apocalypsebleu.moddetective.core.FrameSample;
 import fr.apocalypsebleu.moddetective.core.FreezeDetector;
+import fr.apocalypsebleu.moddetective.core.GameplaySamplingGate;
 import fr.apocalypsebleu.moddetective.core.EngineMetricsSnapshot;
 import fr.apocalypsebleu.moddetective.core.RenderThreadWatchdog;
 import fr.apocalypsebleu.moddetective.core.SuspectAnalyzer;
@@ -29,6 +30,7 @@ public final class ClientPerformanceEvents {
             BLACK_BOX, WATCHDOG, new SuspectAnalyzer(), DEVELOPMENT_METRICS,
             DetectiveSupportService::onIncidentRecorded);
     private static final SamplingContinuityGate CONTINUITY_GATE = new SamplingContinuityGate();
+    private static final GameplaySamplingGate GAMEPLAY_GATE = new GameplaySamplingGate();
 
     private static boolean watchdogStartAttempted;
     private static boolean gameplayActive;
@@ -71,10 +73,20 @@ public final class ClientPerformanceEvents {
         double frameMs = (nowNanos - frameStartNanos) / 1_000_000.0;
 
         Minecraft minecraft = Minecraft.getInstance();
-        // Pauses and lost focus are not gameplay incidents. Skip the first resumed frame too,
-        // because its duration still contains part of the suspended interval.
-        if (!CONTINUITY_GATE.shouldRecord(!minecraft.isPaused() && minecraft.isWindowActive())
-                || frameMs <= 0.0 || frameMs > MAX_USEFUL_FRAME_MS) {
+        boolean samplingAllowed = !minecraft.isPaused() && minecraft.isWindowActive();
+        if (frameMs <= 0.0) {
+            return;
+        }
+        if (frameMs > MAX_USEFUL_FRAME_MS) {
+            // A minimized or suspended client may render no inactive frames. In that case the
+            // oversized first interval is the only observable discontinuity, so explicitly arm
+            // the restoration window before discarding it.
+            CONTINUITY_GATE.markDiscontinuity();
+            return;
+        }
+        // Pauses and lost focus are not gameplay incidents. Skip three resumed frames because
+        // native window restoration can continue after the first active render frame.
+        if (!CONTINUITY_GATE.shouldRecord(samplingAllowed)) {
             return;
         }
 
@@ -111,10 +123,15 @@ public final class ClientPerformanceEvents {
 
         BLACK_BOX.add(frame);
         boolean gameplayNow = minecraft.level != null && minecraft.player != null;
-        if (gameplayNow) {
+        if (GAMEPLAY_GATE.shouldDetect(gameplayNow ? minecraft.level : null, nowNanos)) {
             gameplayActive = true;
             FREEZE_DETECTOR.accept(frame, frameStartNanos, nowNanos);
-        } else if (gameplayActive) {
+        } else if (!gameplayNow && gameplayActive) {
+            gameplayActive = false;
+            FREEZE_DETECTOR.resetBaseline();
+        } else if (gameplayNow && gameplayActive) {
+            // A new ClientLevel means a world join or dimension transition. Do not carry the
+            // previous baseline/debounce into its five-second stabilization window.
             gameplayActive = false;
             FREEZE_DETECTOR.resetBaseline();
         }
@@ -136,10 +153,12 @@ public final class ClientPerformanceEvents {
                 watchdog.retainedStackFrames(),
                 BLACK_BOX.size(),
                 detector.queueSize(),
+                detector.maximumQueueSize(),
                 detector.queueCapacity(),
                 detector.droppedIncidents(),
                 detector.processedIncidents(),
                 detector.averageProcessingMs(),
+                detector.p95ProcessingMs(),
                 detector.maximumProcessingMs());
     }
 

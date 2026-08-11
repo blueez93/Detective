@@ -59,7 +59,7 @@ final class SupportReportFixtures {
                 new ModpackChangesViewModel.Change(ModpackChangesViewModel.Type.UPDATED,
                         "jei", "Just Enough Items", "19.39.0.372", "19.44.0.399")));
         return new SupportReportData(
-                "0.5.0-alpha.1",
+                "0.6.0-alpha.1",
                 "1.21.1",
                 "21.1.235",
                 detail,
@@ -73,7 +73,7 @@ final class SupportReportFixtures {
 
     static List<SupportReportData.InstalledMod> normalMods() {
         return List.of(
-                new SupportReportData.InstalledMod("detective", "Detective", "0.5.0-alpha.1", "detective.jar"),
+                new SupportReportData.InstalledMod("detective", "Detective", "0.6.0-alpha.1", "detective.jar"),
                 new SupportReportData.InstalledMod("jei", "Just Enough Items", "19.44.0.399", "jei.jar"));
     }
 

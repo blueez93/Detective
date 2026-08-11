@@ -23,6 +23,9 @@ sourceSets.main.resources {
 }
 
 sourceSets {
+    serverValidation {
+        runtimeClasspath += output + compileClasspath
+    }
     validation {
         compileClasspath += sourceSets.main.output
         runtimeClasspath += output + compileClasspath
@@ -107,11 +110,15 @@ runs {
     }
 
     server {
+        // NeoGradle requires a mod source for a run, but the dedicated-server check must not
+        // inject Detective. This deliberately empty source set supplies only the NeoForge SDK.
+        modSource project.sourceSets.serverValidation
         systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
         argument '--nogui'
     }
 
     gameTestServer {
+        modSource project.sourceSets.main
         systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
     }
 
@@ -123,6 +130,8 @@ runs {
 
 configurations {
     runtimeClasspath.extendsFrom localRuntime
+    serverValidationImplementation.extendsFrom implementation
+    serverValidationRuntimeOnly.extendsFrom runtimeOnly
     validationImplementation.extendsFrom implementation
     validationRuntimeOnly.extendsFrom runtimeOnly
     validationBImplementation.extendsFrom implementation
@@ -144,6 +153,7 @@ tasks.withType(ProcessResources).configureEach {
             minecraft_version      : minecraft_version,
             minecraft_version_range: minecraft_version_range,
             neo_version            : neo_version,
+            neo_min_version        : neo_min_version,
             loader_version_range   : loader_version_range,
             mod_id                 : mod_id,
             mod_name               : mod_name,
@@ -225,7 +235,7 @@ tasks.register('prepareValidationPack') {
                 temporary.delete()
                 logger.lifecycle("Validation pack: downloading ${entry.name} ${entry.version} from Modrinth")
                 def connection = URI.create(entry.downloadUrl).toURL().openConnection()
-                connection.setRequestProperty('User-Agent', 'Detective-validation/0.3 (local development)')
+                connection.setRequestProperty('User-Agent', 'Detective-validation/0.6 (local development)')
                 connection.connectTimeout = 15_000
                 connection.readTimeout = 60_000
                 connection.inputStream.withCloseable { input ->
@@ -260,6 +270,10 @@ tasks.register('verifyValidationPack') {
         }
         logger.lifecycle("Validation pack: ${manifest.mods.size()} pinned mods verified")
     }
+}
+
+tasks.named('verifyValidationPack') {
+    mustRunAfter tasks.named('prepareValidationPack')
 }
 
 if (providers.gradleProperty('detectiveValidationPack').map(String::toBoolean).orElse(false).get()) {

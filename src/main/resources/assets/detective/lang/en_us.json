@@ -138,6 +138,7 @@
   "detective.ui.export.success.subtitle": "Your local report is ready.",
   "detective.ui.export.success.body": "Your report was created successfully.",
   "detective.ui.export.open_folder": "Open Folder",
+  "detective.ui.export.open_folder_failed": "The report folder could not be opened.",
 
   "detective.ui.settings.title": "DETECTIVE SETTINGS",
   "detective.ui.settings.subtitle": "Essential settings for daily use.",

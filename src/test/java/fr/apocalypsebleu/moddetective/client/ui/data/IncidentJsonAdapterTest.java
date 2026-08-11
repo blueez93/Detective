@@ -13,6 +13,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class IncidentJsonAdapterTest {
     @TempDir
@@ -93,5 +94,42 @@ class IncidentJsonAdapterTest {
 
         assertEquals(100, downsampled.size());
         assertTrue(downsampled.stream().anyMatch(point -> point.frameMs() == 1_200.0));
+    }
+
+    @Test
+    void toleratesLegacyFutureAndInvalidFieldTypes() throws IOException {
+        Path source = temporaryDirectory.resolve("freeze-schema-variants.json");
+        Files.writeString(source, """
+                {
+                  "schemaVersion": 999,
+                  "detectedAtEpochMs": "invalid",
+                  "durationMs": 180.0,
+                  "watchdogSamples": "invalid",
+                  "futureField": {"ignored": true},
+                  "frame": {"dimension":"example:future_dimension","playerX":"bad","playerY":64},
+                  "attributionEvidence": {"state":"FUTURE_STATE"},
+                  "suspects": [{"modId":"future","modName":"Future","presenceSamples":"bad"}],
+                  "blackBox": [{"frameMs":"bad"},{"frameMs":16.0}]
+                }
+                """);
+
+        var detail = IncidentJsonAdapter.readDetail(source);
+
+        assertEquals(EvidenceBadge.UNKNOWN, detail.summary().evidence());
+        assertEquals(0L, detail.summary().detectedAtEpochMs());
+        assertEquals(0, detail.summary().watchdogSamples());
+        assertEquals(1, detail.blackBox().size());
+        assertTrue(detail.blackBoxPartial());
+    }
+
+    @Test
+    void rejectsEmptyAndTruncatedIncidentAsOneUnreadableRecord() throws IOException {
+        Path empty = temporaryDirectory.resolve("freeze-empty.json");
+        Path truncated = temporaryDirectory.resolve("freeze-truncated.json");
+        Files.writeString(empty, "");
+        Files.writeString(truncated, "{\"blackBox\":[");
+
+        assertThrows(IOException.class, () -> IncidentJsonAdapter.readDetail(empty));
+        assertThrows(IOException.class, () -> IncidentJsonAdapter.readDetail(truncated));
     }
 }

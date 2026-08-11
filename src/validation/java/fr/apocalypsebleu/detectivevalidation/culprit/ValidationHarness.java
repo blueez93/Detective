@@ -411,7 +411,7 @@ public final class ValidationHarness {
             long estimatedRetainedBytes = estimateRetainedBytes(metrics);
             String phase = currentPhaseName();
             DetectiveTestCulprit.LOGGER.info(
-                    "[Detective Validation] OVERHEAD phase={} samples/s={} captureAvg={} us p50={} us p95={} us p99={} us captureMax={} us latencyWindow={} retainedStacks={} retainedFrames={} blackBox={} workerQueue={}/{} dropped={} incidentsProcessed={} incidentAvg={} ms incidentMax={} ms jvmHeapMiB={} detectiveRetainedEstimateKiB={}",
+                    "[Detective Validation] OVERHEAD phase={} samples/s={} captureAvg={} us p50={} us p95={} us p99={} us captureMax={} us latencyWindow={} retainedStacks={} retainedFrames={} blackBox={} workerQueue={}/{} workerQueueMax={} dropped={} incidentsProcessed={} incidentAvg={} ms incidentP95={} ms incidentMax={} ms jvmHeapMiB={} detectiveRetainedEstimateKiB={}",
                     phase,
                     round(metrics.watchdogSamplesPerSecond()),
                     round(metrics.averageWatchdogCaptureMicros()),
@@ -425,9 +425,11 @@ public final class ValidationHarness {
                     metrics.blackBoxSamples(),
                     metrics.incidentWorkerQueueSize(),
                     metrics.incidentWorkerQueueCapacity(),
+                    metrics.maximumIncidentWorkerQueueSize(),
                     metrics.droppedIncidents(),
                     metrics.processedIncidents(),
                     round(metrics.averageIncidentProcessingMs()),
+                    round(metrics.p95IncidentProcessingMs()),
                     round(metrics.maximumIncidentProcessingMs()),
                     round(usedHeapBytes / 1024.0 / 1024.0),
                     round(estimatedRetainedBytes / 1024.0));

@@ -1,6 +1,6 @@
 package fr.apocalypsebleu.moddetective.client.ui;
 
-import net.minecraft.Util;
+import fr.apocalypsebleu.moddetective.client.support.LocalFolderOpener;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
@@ -13,6 +13,7 @@ import java.util.Objects;
 public final class SupportReportCreatedScreen extends Screen {
     private final Screen parent;
     private final Path report;
+    private boolean openFolderFailed;
 
     public SupportReportCreatedScreen(Screen parent, Path report) {
         super(Component.translatable("detective.ui.export.success.title"));
@@ -34,9 +35,7 @@ public final class SupportReportCreatedScreen extends Screen {
 
     private void openFolder() {
         Path folder = report.getParent();
-        if (folder != null) {
-            Util.getPlatform().openFile(folder.toFile());
-        }
+        openFolderFailed = LocalFolderOpener.open(folder) != LocalFolderOpener.Result.OPENED;
     }
 
     @Override
@@ -59,6 +58,11 @@ public final class SupportReportCreatedScreen extends Screen {
         graphics.drawCenteredString(this.font,
                 Component.translatable("detective.ui.export.local_only"),
                 this.width / 2, top + 53, DetectiveUiRenderer.MUTED);
+        if (openFolderFailed) {
+            graphics.drawCenteredString(this.font,
+                    Component.translatable("detective.ui.export.open_folder_failed"),
+                    this.width / 2, top + 66, 0xFFFF7777);
+        }
         DetectiveUiRenderer.widgets(this, graphics, mouseX, mouseY, partialTick);
     }
 

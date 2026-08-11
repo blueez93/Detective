@@ -21,31 +21,31 @@ final class RealWorldValidationPlan {
         }
 
         long totalMs = SOAK_MINUTES * 60_000L;
-        phase("stable_gameplay", true, 0L);
-        phase("rapid_chunk_generation", true, fraction(totalMs, 0.20));
+        activePhase("stable_gameplay", true, 0L);
+        activePhase("rapid_chunk_generation", true, fraction(totalMs, 0.20));
         for (int index = 0; index < 6; index++) {
             int distance = (index + 1) * 4_000;
             schedule(() -> sendCommand("tp @s " + distance + " 100 " + distance),
                     fraction(totalMs, 0.21 + index * 0.025));
         }
 
-        phase("large_inventory_menu", true, fraction(totalMs, 0.40));
+        activePhase("large_inventory_menu", true, fraction(totalMs, 0.40));
         schedule(RealWorldValidationPlan::openInventory, fraction(totalMs, 0.405));
         schedule(() -> Minecraft.getInstance().setScreen(null), fraction(totalMs, 0.44));
 
-        phase("dimension_change", true, fraction(totalMs, 0.48));
+        activePhase("dimension_change", true, fraction(totalMs, 0.48));
         schedule(() -> sendCommand("execute in minecraft:the_nether run tp @s 0 90 0"), fraction(totalMs, 0.49));
-        schedule(() -> sendCommand("execute in minecraft:overworld run tp @s 0 100 0"), fraction(totalMs, 0.55));
+        schedule(() -> sendCommand("execute in minecraft:the_end run tp @s 0 90 0"), fraction(totalMs, 0.53));
+        schedule(() -> sendCommand("execute in minecraft:overworld run tp @s 0 100 0"), fraction(totalMs, 0.56));
 
-        phase("resource_reload", true, fraction(totalMs, 0.58));
+        activePhase("resource_reload", true, fraction(totalMs, 0.58));
         schedule(() -> Minecraft.getInstance().reloadResourcePacks(), fraction(totalMs, 0.59));
 
-        phase("explicit_gc_pressure", false, fraction(totalMs, 0.66));
+        activePhase("explicit_gc_pressure", false, fraction(totalMs, 0.66));
         schedule(GcValidationScenario::start, fraction(totalMs, 0.67));
 
-        phase("controlled_attribution", false, fraction(totalMs, 0.72));
+        activePhase("controlled_attribution", false, fraction(totalMs, 0.72));
         long attributionStart = fraction(totalMs, 0.73);
-        schedule(RealWorldValidationPlan::focusWindow, fraction(totalMs, 0.715));
         schedule(() -> ValidationCommands.runStall("realworld-direct-a", 600L, true,
                 ControlledFreezeGenerator.Path.DIRECT_A, 1), attributionStart);
         schedule(() -> ValidationCommands.runStall("realworld-direct-b", 600L, true,
@@ -65,7 +65,7 @@ final class RealWorldValidationPlan {
         schedule(() -> ValidationCommands.runStall("realworld-b-to-c-to-a", 600L, true,
                 ControlledFreezeGenerator.Path.B_TO_C_TO_A, 3), attributionStart + 40_000L);
 
-        phase("pause_menu", true, fraction(totalMs, 0.82));
+        activePhase("pause_menu", true, fraction(totalMs, 0.82));
         schedule(() -> Minecraft.getInstance().setScreen(new PauseScreen(true)), fraction(totalMs, 0.825));
         schedule(() -> Minecraft.getInstance().setScreen(null), fraction(totalMs, 0.86));
 
@@ -73,11 +73,11 @@ final class RealWorldValidationPlan {
         schedule(RealWorldValidationPlan::iconifyWindow, fraction(totalMs, 0.87));
         schedule(RealWorldValidationPlan::restoreWindow, fraction(totalMs, 0.875));
 
-        phase("world_disconnect_reconnect", true, fraction(totalMs, 0.88));
+        activePhase("world_disconnect_reconnect", true, fraction(totalMs, 0.88));
         schedule(() -> Minecraft.getInstance().disconnect(new TitleScreen()), fraction(totalMs, 0.885));
         schedule(RealWorldValidationPlan::reconnect, fraction(totalMs, 0.90));
 
-        phase("stable_gameplay_final", true, fraction(totalMs, 0.92));
+        activePhase("stable_gameplay_final", true, fraction(totalMs, 0.92));
         schedule(() -> {
             ValidationHarness.beginPhase("shutdown", true);
             ValidationHarness.logMetrics();
@@ -98,6 +98,14 @@ final class RealWorldValidationPlan {
 
     private static void phase(String name, boolean falsePositiveEligible, long delayMs) {
         schedule(() -> ValidationHarness.beginPhase(name, falsePositiveEligible), delayMs);
+    }
+
+    private static void activePhase(String name, boolean falsePositiveEligible, long delayMs) {
+        phase(name, falsePositiveEligible, delayMs);
+        // Codex validation runs headfully while their controlling application may take focus.
+        // Keep each active phase measurable without touching production focus handling. The
+        // dedicated alt_tab_unfocused phase deliberately does not use this helper.
+        schedule(RealWorldValidationPlan::focusWindow, delayMs + 50L);
     }
 
     private static void schedule(Runnable action, long delayMs) {
@@ -145,6 +153,6 @@ final class RealWorldValidationPlan {
         long window = Minecraft.getInstance().getWindow().getWindow();
         GLFW.glfwRestoreWindow(window);
         GLFW.glfwFocusWindow(window);
-        DetectiveTestCulprit.LOGGER.info("[Detective Validation] Focus restored before controlled attribution");
+        DetectiveTestCulprit.LOGGER.info("[Detective Validation] Focus restored for active validation phase");
     }
 }

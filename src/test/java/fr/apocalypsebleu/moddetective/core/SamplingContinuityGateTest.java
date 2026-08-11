@@ -38,4 +38,16 @@ class SamplingContinuityGateTest {
         assertFalse(gate.shouldRecord(true));
         assertTrue(gate.shouldRecord(true));
     }
+
+    @Test
+    void explicitDiscontinuitySkipsThreeRestorationFrames() {
+        SamplingContinuityGate gate = new SamplingContinuityGate();
+
+        assertTrue(gate.shouldRecord(true));
+        gate.markDiscontinuity();
+        assertFalse(gate.shouldRecord(true));
+        assertFalse(gate.shouldRecord(true));
+        assertFalse(gate.shouldRecord(true));
+        assertTrue(gate.shouldRecord(true));
+    }
 }

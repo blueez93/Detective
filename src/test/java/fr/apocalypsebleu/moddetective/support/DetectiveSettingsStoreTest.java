@@ -58,4 +58,49 @@ class DetectiveSettingsStoreTest {
 
         assertEquals(DetectiveSettings.defaults(), new DetectiveSettingsStore(target).load());
     }
+
+    @Test
+    void emptyAndTruncatedFilesFallBackToSafeDefaults() throws IOException {
+        Path target = temporaryDirectory.resolve("settings.json");
+        DetectiveSettingsStore store = new DetectiveSettingsStore(target);
+
+        Files.writeString(target, "");
+        assertEquals(DetectiveSettings.defaults(), store.load());
+        Files.writeString(target, "{\"incidentNotifications\":false");
+        assertEquals(DetectiveSettings.defaults(), store.load());
+    }
+
+    @Test
+    void clampsNegativeAndHugeNumericValues() throws IOException {
+        Path target = temporaryDirectory.resolve("settings.json");
+        Files.writeString(target, """
+                {
+                  "incidentHistoryLimit": -500,
+                  "dataRetentionDays": 2147483647
+                }
+                """);
+
+        DetectiveSettings loaded = new DetectiveSettingsStore(target).load();
+
+        assertEquals(DetectiveSettings.MINIMUM_HISTORY_LIMIT, loaded.incidentHistoryLimit());
+        assertEquals(DetectiveSettings.MAXIMUM_RETENTION_DAYS, loaded.dataRetentionDays());
+    }
+
+    @Test
+    void normalizesOldAndFutureSchemasAndIgnoresUnknownFields() throws IOException {
+        Path target = temporaryDirectory.resolve("settings.json");
+        DetectiveSettingsStore store = new DetectiveSettingsStore(target);
+        Files.writeString(target, """
+                {"schemaVersion":0,"incidentNotifications":false,"futureField":"ignored"}
+                """);
+        assertFalse(store.load().incidentNotifications());
+        assertEquals(DetectiveSettings.SCHEMA_VERSION, store.load().schemaVersion());
+
+        Files.writeString(target, """
+                {"schemaVersion":999,"incidentHistoryLimit":100,"dataRetentionDays":90}
+                """);
+        assertEquals(100, store.load().incidentHistoryLimit());
+        assertEquals(90, store.load().dataRetentionDays());
+        assertEquals(DetectiveSettings.SCHEMA_VERSION, store.load().schemaVersion());
+    }
 }

@@ -1,0 +1,23 @@
+modLoader="javafml"
+loaderVersion="[1,)"
+license="All Rights Reserved"
+
+[[mods]]
+modId="detective_servervalidation"
+version="1"
+displayName="Detective Server Validation Marker"
+description='''Development-only marker proving that the dedicated server run does not load Detective.'''
+
+[[dependencies.detective_servervalidation]]
+modId="neoforge"
+type="required"
+versionRange="[21.1.235,)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.detective_servervalidation]]
+modId="minecraft"
+type="required"
+versionRange="[1.21.1]"
+ordering="NONE"
+side="BOTH"

@@ -26,4 +26,15 @@ class IncidentNotificationCooldownTest {
         assertTrue(cooldown.register("enabled", 101L, true));
         assertFalse(cooldown.register("enabled", 200L, true));
     }
+
+    @Test
+    void remainsBoundedDuringAHighVolumeIncidentHistory() {
+        IncidentNotificationCooldown cooldown = new IncidentNotificationCooldown(0L);
+
+        for (int index = 0; index < 10_000; index++) {
+            assertTrue(cooldown.register("freeze-" + index, index, true));
+        }
+
+        assertTrue(cooldown.trackedIncidentCount() <= 256);
+    }
 }

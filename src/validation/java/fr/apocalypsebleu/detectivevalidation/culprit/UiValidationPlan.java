@@ -417,12 +417,12 @@ public final class UiValidationPlan {
     private static void createRuntimeValidationReport(IncidentDetailViewModel incident) {
         try {
             SupportReportData data = new SupportReportData(
-                    "0.5.0-alpha.1",
+                    "0.6.0-alpha.1",
                     "1.21.1",
                     "21.1.235",
                     incident,
                     List.of(new SupportReportData.InstalledMod(
-                            "detective", "Detective", "0.5.0-alpha.1", "detective.jar")),
+                            "detective", "Detective", "0.6.0-alpha.1", "detective.jar")),
                     syntheticModpackChanges(),
                     DetectiveSettings.defaults(),
                     SupportReportData.Environment.capture());

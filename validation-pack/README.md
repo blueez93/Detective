@@ -1,6 +1,6 @@
-# Detective v0.3 realistic validation pack
+# Detective realistic validation pack
 
-This pack exists only for local development validation of Detective on Minecraft 1.21.1 / NeoForge 21.1.235. It is not a Detective dependency and is not a redistributed modpack.
+This pack exists only for local development validation of Detective on Minecraft 1.21.1. It is not a Detective dependency and is not a redistributed modpack. The release-hardening profile targets NeoForge 21.1.238 through 21.1.248; the historical v0.3 profile for NeoForge 21.1.235 is preserved in `modrinth-pack-v0.3-historical.json`.
 
 `modrinth-pack.json` is the authoritative machine-readable manifest. Every file is fetched unchanged from the official Modrinth CDN and verified with SHA-512 before use.
 
@@ -15,12 +15,12 @@ This pack exists only for local development validation of Detective on Minecraft
 | Content | Farmer's Delight | 1.21.1-1.3.2 | MIT | client + server |
 | Worldgen/content | Regions Unexplored | 0.6.2-neoforge-21.1 | MIT | client + server |
 | Worldgen library | Lithostitched | 1.7.13-neoforge-21.1 | MIT | client + server |
-| Inventory/QoL | Just Enough Items | 19.39.0.372 | MIT | client |
+| Inventory/QoL | Just Enough Items | 19.44.0.401 | MIT | client |
 | Client/QoL | Jade | 15.10.6+neoforge | CC-BY-NC-SA-4.0 | client + server |
 | Inventory library | Curios API | 9.5.1+1.21.1 | LGPL-3.0-or-later | client + server |
 | Animation/render library | GeckoLib | 4.9.2 | MIT | client + server |
 
-JEI 19.39.0.372 is intentionally pinned instead of the newer 19.42+/19.44 builds: inspection of the embedded `META-INF/neoforge.mods.toml` showed that 19.42.0.379 and later require NeoForge 21.1.238, while 19.39.0.372 remains compatible with the project's fixed 21.1.235 target.
+JEI 19.44.0.401 is the current 1.21.1 NeoForge release used by the modern hardening profile. Its NeoForge floor is newer than 21.1.235, so the compatibility checkpoint for Detective's demonstrated minimum uses the preserved historical manifest and JEI 19.39.0.372. Sodium 0.8.12 remains the latest stable 1.21.1 release; the newer 0.8.13 build available during this audit is explicitly marked beta.
 
 Terralith was evaluated and rejected because the Stardust Labs license explicitly prohibits use as part of an AI project. Regions Unexplored and Lithostitched provide a substantial MIT-licensed world-generation workload instead.
 

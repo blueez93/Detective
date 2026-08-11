@@ -40,7 +40,7 @@ class SupportReportExporterTest {
         var json = JsonParser.parseString(manifest).getAsJsonObject();
         assertEquals(1, json.get("schemaVersion").getAsInt());
         assertEquals(1, json.get("reportFormat").getAsInt());
-        assertEquals("0.5.0-alpha.1", json.get("detectiveVersion").getAsString());
+        assertEquals("0.6.0-alpha.1", json.get("detectiveVersion").getAsString());
         assertEquals(1, json.get("incidentCount").getAsInt());
     }
 
@@ -145,10 +145,36 @@ class SupportReportExporterTest {
         for (String forbidden : List.of(
                 "accesstoken", "username", "user.home", "hostname", "192.168.1.44",
                 "10.0.0.2", "session-id", "550e8400-e29b-41d4-a716-446655440000",
-                home.toLowerCase(Locale.ROOT), "latest.log")) {
+                home.toLowerCase(Locale.ROOT),
+                System.getProperty("user.name", "private").toLowerCase(Locale.ROOT),
+                "latest.log")) {
             assertFalse(all.contains(forbidden), () -> "Sensitive report content: " + forbidden);
         }
         assertFalse(names(report).stream().anyMatch(name -> name.endsWith("latest.log")));
+    }
+
+    @Test
+    void finalZipRedactsIpv6AndMacAddressesFromHostileModMetadata() throws IOException {
+        List<SupportReportData.InstalledMod> hostileMetadata = List.of(
+                new SupportReportData.InstalledMod(
+                        "network_probe",
+                        "Server 2001:db8:85a3::8a2e:370:7334",
+                        "MAC 00:1A:2B:3C:4D:5E",
+                        "network-probe.jar"));
+        SupportReportData data = SupportReportFixtures.data(
+                EvidenceBadge.HIGH_EVIDENCE, hostileMetadata,
+                "fe80::1 ff-ff-ff-ff-ff-ff");
+
+        Path report = SupportReportExporter.export(data, temporaryDirectory, FIXED_CLOCK);
+        String all = allText(report).toLowerCase(Locale.ROOT);
+
+        for (String forbidden : List.of(
+                "2001:db8:85a3::8a2e:370:7334",
+                "fe80::1",
+                "00:1a:2b:3c:4d:5e",
+                "ff-ff-ff-ff-ff-ff")) {
+            assertFalse(all.contains(forbidden), () -> "Sensitive network identifier: " + forbidden);
+        }
     }
 
     @Test
@@ -167,6 +193,40 @@ class SupportReportExporterTest {
                 "detective-report/modpack/changes.json",
                 "detective-report/system/environment.json"), names(report));
         assertTrue(Files.size(report) < 500_000L);
+    }
+
+    @Test
+    void exportsEveryClassificationAndTwentyFiveUniqueValidReports() throws IOException {
+        List<EvidenceBadge> states = List.of(
+                EvidenceBadge.HIGH_EVIDENCE,
+                EvidenceBadge.MODERATE_EVIDENCE,
+                EvidenceBadge.LOW_EVIDENCE,
+                EvidenceBadge.AMBIGUOUS_ATTRIBUTION,
+                EvidenceBadge.INSUFFICIENT_EVIDENCE,
+                EvidenceBadge.JVM_GC_SUSPECTED,
+                EvidenceBadge.NATIVE_OR_DRIVER_STALL_POSSIBLE,
+                EvidenceBadge.UNKNOWN);
+
+        java.util.Set<Path> reports = new java.util.HashSet<>();
+        for (int index = 0; index < 25; index++) {
+            Path report = SupportReportExporter.export(
+                    SupportReportFixtures.data(states.get(index % states.size())),
+                    temporaryDirectory, FIXED_CLOCK);
+            reports.add(report);
+            assertTrue(Files.size(report) < 500_000L, report.toString());
+            assertFalse(names(report).stream().anyMatch(name -> name.endsWith("latest.log")));
+            try (ZipFile zip = new ZipFile(report.toFile(), StandardCharsets.UTF_8)) {
+                for (ZipEntry zipEntry : zip.stream().toList()) {
+                    if (zipEntry.getName().endsWith(".json")) {
+                        String json = new String(zip.getInputStream(zipEntry).readAllBytes(), StandardCharsets.UTF_8);
+                        assertEquals(1, JsonParser.parseString(json).getAsJsonObject()
+                                .get("schemaVersion").getAsInt());
+                    }
+                }
+            }
+        }
+
+        assertEquals(25, reports.size());
     }
 
     private Path export(EvidenceBadge evidence) throws IOException {

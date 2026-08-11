@@ -5,8 +5,8 @@
 
 Detective should turn technical profiling evidence into a clear, cautious investigation for normal Minecraft players and modpack maintainers. Detective finds the evidence; the player makes the call.
 
-## v0.5 scope — Support & Daily Use
-A local-only support workflow over the validated v0.3.1 engine and v0.4.1 investigation UI. A recorded incident can produce a privacy-previewed, versioned support ZIP; essential settings control notifications, bounded history retention, and the default evidence view. The production attribution algorithm remains unchanged. Product copy follows: “Detect. Measure. Explain. Never accuse.”
+## v0.6 scope — Release Hardening
+No major product feature is added. v0.6 stress-tests the validated v0.3.1 engine, v0.4.1 UI and v0.5 local support workflow across loader checkpoints, corrupt files, privacy attacks, bounded queues/history, repeated connections, GC pauses and realistic runtime phases. The production attribution algorithm remains unchanged. Product copy follows: “Detect. Measure. Explain. Never accuse.”
 
 ### Production subsystems
 - Snapshot: pack state and version changes.
@@ -38,6 +38,8 @@ A local-only support workflow over the validated v0.3.1 engine and v0.4.1 invest
 - Phase incident JSON is analyzed on validation workers, not the render thread.
 - The public JAR contains only `sourceSets.main`.
 - The UI screenshot route covers the v0.4.1 investigation states plus v0.5 export preview/success, settings, clear-history confirmation, and notification cooldown. Accessibility onboarding and the experimental-world confirmation are handled only in this development route.
+- A dedicated-server source set prevents Detective `main` from being injected into `runServer`; a development-only marker satisfies NeoGradle without entering the public JAR.
+- The release-hardening plan includes a configurable real-world soak, active-phase focus control for headful automation, and a 20-cycle connection lifecycle check.
 
 ### v0.3.1 measured result
 - The immutable v0.3 baseline remains in `validation-pack/RESULTS-v0.3.md`.
@@ -62,10 +64,20 @@ A local-only support workflow over the validated v0.3.1 engine and v0.4.1 invest
 - The runtime ZIP contained ten allow-listed entries and eight valid schema-v1 JSON documents; it contained no `latest.log` or audited account/session/path/network identifiers.
 - The public `detective-0.5.0-alpha.1.jar` contains only `META-INF`, Detective assets, and `fr.apocalypsebleu.moddetective` classes. Detailed results are in `RESULTS-v0.5.md`.
 
+### v0.6 hardening result
+- NeoForge 21.1.235, 21.1.238 and 21.1.248 build and run Detective; 21.1.235 is the demonstrated minimum and 21.1.248 the recommended/primary runtime.
+- The final Small Pack protocol ran for 20 minutes with 21 loaded mod ids: 47.81 watchdog samples/s, 178.8 us session mean, 464.9 us final rolling p99, 3.03 MiB maximum retained estimate, queue 1/8 and zero drops.
+- The nine-case attribution replay remains Top-1 9/9 and Top-3 9/9. Two Full G1 pauses correlate with cautious system/native states and no named mod.
+- A five-second new-level detection grace fixes reproducible world-entry incidents. Explicit >10-second render discontinuities now rearm the three-frame focus stabilization window; neither fix changes threshold/ranking/confidence.
+- Corrected 20-cycle dedicated reconnect validation retains one watchdog and creates zero incidents. Detective is absent from the server mod list and has no network protocol.
+- Privacy hardening now redacts IPv6, MAC and local username values supplied through hostile metadata. A real multiplayer ZIP and all stress ZIPs pass final-content scans.
+- Final clean build passes with 96 tests. `detective-0.6.0-alpha.1.jar` is 208,349 bytes, 111 entries/90 classes, and contains no validation code or nested JAR.
+- Release recommendation remains **NO-GO** because Medium/Large/Stress packs, the requested cumulative 140-minute soak and physical UI/focus/RAM/FPS matrices were not completed. Details are in `RESULTS-v0.6.md`, `COMPATIBILITY-v0.6.md`, `PERFORMANCE-v0.6.md` and `MANUAL-TEST-CHECKLIST-v0.6.md`.
+
 ## Compatibility note
 The public mod id and data directory changed from `moddetective` to `detective` in v0.2. Existing data is moved when possible; conflicts are retained in the legacy directory instead of being overwritten. The Java package remains `fr.apocalypsebleu.moddetective` to avoid a risky package-wide migration during engine validation.
 
-## Non-goals for v0.5
+## Non-goals for v0.6
 - Exact GPU profiling.
 - Server TPS profiling.
 - Automatic disabling of mods.
