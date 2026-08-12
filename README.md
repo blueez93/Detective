@@ -112,3 +112,23 @@ The public JAR is written to `build/libs`. Development validation source sets ar
 ## Project philosophy
 
 **Detective finds the evidence. You make the call.**
+
+## Screenshots
+
+### Monitoring
+![Detective Home](docs/assets/screenshots/01-home-monitoring.png)
+
+### Evidence-based attribution
+![Primary Suspect](docs/assets/screenshots/02-primary-suspect-high-evidence.png)
+
+### Ambiguous attribution
+![Ambiguous Attribution](docs/assets/screenshots/03-ambiguous-attribution.png)
+
+### Black Box
+![Black Box](docs/assets/screenshots/04-black-box.png)
+
+### Modpack Changes
+![Modpack Changes](docs/assets/screenshots/05-modpack-changes.png)
+
+### Support Reports
+![Support Report](docs/assets/screenshots/06-support-report.png)
