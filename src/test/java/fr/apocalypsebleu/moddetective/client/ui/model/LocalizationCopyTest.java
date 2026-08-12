@@ -34,6 +34,18 @@ class LocalizationCopyTest {
         assertEquals("DETECTIVE SETTINGS", english.get("detective.ui.settings.title"));
         assertEquals("No reliable mod attribution",
                 english.get("detective.notification.unattributed"));
+        assertEquals("CASE FILES", english.get("detective.ui.cases.title"));
+        assertEquals("Recurring patterns detected across your incident history.",
+                english.get("detective.ui.cases.subtitle"));
+        assertEquals("No recurring pattern established.",
+                english.get("detective.ui.cases.empty"));
+        assertEquals("Technical similarity: %s   Evidence strength: %s",
+                english.get("detective.ui.cases.strength_summary"));
+        assertEquals("Technical signature #%s",
+                english.get("detective.ui.case.evidence.item"));
+        assertEquals("A recurring pattern indicates repeated technical similarity between incidents. "
+                        + "It does not prove that a mod is defective or solely responsible.",
+                english.get("detective.ui.case.safety"));
     }
 
     @Test

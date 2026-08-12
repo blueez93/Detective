@@ -7,6 +7,7 @@ import java.util.Locale;
 
 public final class UiFormatters {
     private static final DateTimeFormatter DATE_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private static final DateTimeFormatter COMPACT_DATE_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
     private UiFormatters() {}
 
@@ -27,6 +28,20 @@ public final class UiFormatters {
         return String.format(Locale.ROOT, "%.1f%%", value);
     }
 
+    public static String shortCaseId(String caseId) {
+        if (caseId == null || caseId.isBlank()) {
+            return "UNKNOWN";
+        }
+        String value = caseId.trim();
+        if (value.regionMatches(true, 0, "case-", 0, 5)) {
+            value = value.substring(5);
+        }
+        if (value.length() > 8) {
+            value = value.substring(0, 8);
+        }
+        return value.toUpperCase(Locale.ROOT);
+    }
+
     public static String memory(long bytes) {
         if (bytes < 0L) {
             return "—";
@@ -44,6 +59,18 @@ public final class UiFormatters {
         }
         try {
             return DATE_TIME.format(Instant.ofEpochMilli(epochMs).atZone(ZoneId.systemDefault()));
+        } catch (RuntimeException ignored) {
+            return "—";
+        }
+    }
+
+    /** Compact list formatting; detailed screens keep seconds via {@link #dateTime(long)}. */
+    public static String compactDateTime(long epochMs) {
+        if (epochMs <= 0L) {
+            return "—";
+        }
+        try {
+            return COMPACT_DATE_TIME.format(Instant.ofEpochMilli(epochMs).atZone(ZoneId.systemDefault()));
         } catch (RuntimeException ignored) {
             return "—";
         }

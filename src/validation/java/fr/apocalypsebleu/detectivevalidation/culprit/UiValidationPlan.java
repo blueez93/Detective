@@ -8,6 +8,8 @@ import fr.apocalypsebleu.moddetective.client.ui.ExportSupportReportScreen;
 import fr.apocalypsebleu.moddetective.client.ui.SupportReportCreatedScreen;
 import fr.apocalypsebleu.moddetective.client.ui.DetectiveSettingsScreen;
 import fr.apocalypsebleu.moddetective.client.ui.ClearIncidentHistoryScreen;
+import fr.apocalypsebleu.moddetective.client.ui.CaseFileDetailScreen;
+import fr.apocalypsebleu.moddetective.client.ui.CaseFileListScreen;
 import fr.apocalypsebleu.moddetective.client.ClientPerformanceEvents;
 import fr.apocalypsebleu.moddetective.client.support.DetectiveSupportService;
 import fr.apocalypsebleu.moddetective.client.ui.data.DetectiveUiService;
@@ -52,6 +54,13 @@ public final class UiValidationPlan {
     private static final String PUBLIC_DEMO_CHANGES_ROUTE = "public-demo-changes";
     private static final String PUBLIC_DEMO_SUPPORT_REPORT_ROUTE = "public-demo-support-report";
     private static final String PUBLIC_DEMO_HOME_ROUTE = "public-demo-home";
+    private static final String CASE_FILES_EMPTY_ROUTE = "case-files-empty";
+    private static final String CASE_FILES_ONE_ROUTE = "case-files-one";
+    private static final String CASE_FILES_MULTIPLE_ROUTE = "case-files-multiple";
+    private static final String CASE_FILE_DETAIL_ROUTE = "case-file-detail";
+    private static final String CASE_FILE_MIXED_ROUTE = "case-file-mixed";
+    private static final String CASE_FILES_LEGACY_ROUTE = "case-files-legacy";
+    private static final String CASE_FILES_HOME_ROUTE = "case-files-home";
     private static final String PUBLIC_DEMO_PRIMARY_SCREENSHOT = "detective-v070-public-demo-incident.png";
     private static final String PUBLIC_DEMO_AMBIGUOUS_SCREENSHOT =
             "detective-v070-public-demo-ambiguous.png";
@@ -190,10 +199,25 @@ public final class UiValidationPlan {
                 || PUBLIC_DEMO_BLACK_BOX_ROUTE.equals(route)
                 || PUBLIC_DEMO_CHANGES_ROUTE.equals(route)
                 || PUBLIC_DEMO_SUPPORT_REPORT_ROUTE.equals(route)
-                || PUBLIC_DEMO_HOME_ROUTE.equals(route);
+                || PUBLIC_DEMO_HOME_ROUTE.equals(route)
+                || isCaseFileRoute(route);
+    }
+
+    private static boolean isCaseFileRoute(String route) {
+        return CASE_FILES_EMPTY_ROUTE.equals(route)
+                || CASE_FILES_ONE_ROUTE.equals(route)
+                || CASE_FILES_MULTIPLE_ROUTE.equals(route)
+                || CASE_FILE_DETAIL_ROUTE.equals(route)
+                || CASE_FILE_MIXED_ROUTE.equals(route)
+                || CASE_FILES_LEGACY_ROUTE.equals(route)
+                || CASE_FILES_HOME_ROUTE.equals(route);
     }
 
     private static void beginPublicDemo() {
+        if (isCaseFileRoute(publicDemoRoute)) {
+            beginCaseFileDemo();
+            return;
+        }
         Minecraft minecraft = Minecraft.getInstance();
         boolean ambiguous = PUBLIC_DEMO_AMBIGUOUS_ROUTE.equals(publicDemoRoute);
         boolean blackBox = PUBLIC_DEMO_BLACK_BOX_ROUTE.equals(publicDemoRoute);
@@ -245,6 +269,49 @@ public final class UiValidationPlan {
             } else if (blackBox) {
                 schedule(() -> scrollDetail(-13.5), 1_300L);
             }
+            schedule(() -> screenshot(screenshotName), 2_500L);
+            schedule(UiValidationPlan::complete, 3_500L);
+        });
+    }
+
+    private static void beginCaseFileDemo() {
+        Minecraft minecraft = Minecraft.getInstance();
+        minecraft.options.guiScale().set(2);
+        minecraft.resizeDisplay();
+        minecraft.getLanguageManager().setSelected("en_us");
+        minecraft.reloadResourcePacks().whenComplete((ignored, error) -> {
+            if (error != null) {
+                DetectiveTestCulprit.LOGGER.error(
+                        "[Detective Validation] Could not load Case Files demo resources", error);
+                RUNNING.set(false);
+                return;
+            }
+            String screenshotName = "detective-v080-" + publicDemoRoute + ".png";
+            schedule(() -> {
+                Screen parent = Minecraft.getInstance().screen;
+                switch (publicDemoRoute) {
+                    case CASE_FILES_EMPTY_ROUTE -> Minecraft.getInstance().setScreen(
+                            new CaseFileListScreen(parent, CaseFileValidationFixtures.emptyCaseFiles()));
+                    case CASE_FILES_ONE_ROUTE -> Minecraft.getInstance().setScreen(
+                            new CaseFileListScreen(parent, CaseFileValidationFixtures.oneHighConsistencyCase()));
+                    case CASE_FILES_MULTIPLE_ROUTE -> Minecraft.getInstance().setScreen(
+                            new CaseFileListScreen(parent, CaseFileValidationFixtures.multipleCases()));
+                    case CASE_FILE_DETAIL_ROUTE -> Minecraft.getInstance().setScreen(
+                            new CaseFileDetailScreen(parent,
+                                    CaseFileValidationFixtures.caseDetailWithSeveralRelatedIncidents()));
+                    case CASE_FILE_MIXED_ROUTE -> Minecraft.getInstance().setScreen(
+                            new CaseFileDetailScreen(parent,
+                                    CaseFileValidationFixtures.mixedAttributionStates()));
+                    case CASE_FILES_LEGACY_ROUTE -> Minecraft.getInstance().setScreen(
+                            new CaseFileListScreen(parent, CaseFileValidationFixtures.legacySparseHistory()));
+                    case CASE_FILES_HOME_ROUTE -> Minecraft.getInstance().setScreen(
+                            new DetectiveHomeScreen(parent,
+                                    IncidentIndexViewModel.empty(
+                                            System.currentTimeMillis(), System.currentTimeMillis() - 60_000L),
+                                    CaseFileValidationFixtures.oneHighConsistencyCase()));
+                    default -> throw new IllegalStateException("Unknown Case Files route: " + publicDemoRoute);
+                }
+            }, 500L);
             schedule(() -> screenshot(screenshotName), 2_500L);
             schedule(UiValidationPlan::complete, 3_500L);
         });

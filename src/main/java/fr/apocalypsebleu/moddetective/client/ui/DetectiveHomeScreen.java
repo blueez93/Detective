@@ -1,6 +1,7 @@
 package fr.apocalypsebleu.moddetective.client.ui;
 
 import fr.apocalypsebleu.moddetective.client.ui.data.DetectiveUiService;
+import fr.apocalypsebleu.moddetective.client.ui.model.CaseIndexViewModel;
 import fr.apocalypsebleu.moddetective.client.ui.model.DetectiveSummaryViewModel;
 import fr.apocalypsebleu.moddetective.client.ui.model.IncidentIndexViewModel;
 import fr.apocalypsebleu.moddetective.client.ui.model.IncidentSummaryViewModel;
@@ -16,27 +17,46 @@ public final class DetectiveHomeScreen extends Screen {
     private final Screen parent;
     private final boolean refreshOnInit;
     private IncidentIndexViewModel index;
+    private CaseIndexViewModel cases;
     private boolean loading = true;
     private boolean loadFailed;
+    private boolean casesLoading = true;
+    private boolean casesLoadFailed;
     private Button lastIncidentButton;
     private Button exportButton;
     private double scrollOffset;
     private int contentHeight;
 
     public DetectiveHomeScreen(Screen parent) {
-        this(parent, null, true);
+        this(parent, null, null, true);
     }
 
     /** Allows the development-only visual harness to render deterministic states without disk I/O. */
     public DetectiveHomeScreen(Screen parent, IncidentIndexViewModel preloadedIndex) {
-        this(parent, preloadedIndex, false);
+        this(parent, preloadedIndex, CaseIndexViewModel.empty(), false);
     }
 
-    private DetectiveHomeScreen(Screen parent, IncidentIndexViewModel preloadedIndex, boolean refreshOnInit) {
+    /** Allows validation fixtures to include a deterministic recurring-pattern summary. */
+    public DetectiveHomeScreen(
+            Screen parent,
+            IncidentIndexViewModel preloadedIndex,
+            CaseIndexViewModel preloadedCases
+    ) {
+        this(parent, preloadedIndex, preloadedCases, false);
+    }
+
+    private DetectiveHomeScreen(
+            Screen parent,
+            IncidentIndexViewModel preloadedIndex,
+            CaseIndexViewModel preloadedCases,
+            boolean refreshOnInit
+    ) {
         super(Component.translatable("detective.ui.home.title"));
         this.parent = parent;
         this.index = preloadedIndex;
+        this.cases = preloadedCases;
         this.loading = refreshOnInit;
+        this.casesLoading = refreshOnInit;
         this.refreshOnInit = refreshOnInit;
     }
 
@@ -53,28 +73,32 @@ public final class DetectiveHomeScreen extends Screen {
                         button -> this.minecraft.setScreen(new IncidentListScreen(this, index)))
                 .bounds(left, navigationY, buttonWidth, 20)
                 .build());
-        this.lastIncidentButton = this.addRenderableWidget(Button.builder(
-                        Component.translatable("detective.ui.home.last_incident"),
-                        button -> openLastIncident())
+        this.addRenderableWidget(Button.builder(
+                        Component.translatable("detective.ui.home.case_files"),
+                        button -> this.minecraft.setScreen(new CaseFileListScreen(this, cases)))
                 .bounds(left + buttonWidth + gap, navigationY, buttonWidth, 20)
                 .build());
-        this.lastIncidentButton.active = index != null && index.summary().lastIncident() != null;
         this.addRenderableWidget(Button.builder(
                         Component.translatable("detective.ui.home.modpack_changes"),
                         button -> this.minecraft.setScreen(new ModpackChangesScreen(this)))
                 .bounds(left + (buttonWidth + gap) * 2, navigationY, buttonWidth, 20)
                 .build());
-        int secondaryButtonWidth = (contentWidth - gap) / 2;
+        this.lastIncidentButton = this.addRenderableWidget(Button.builder(
+                        Component.translatable("detective.ui.home.last_incident"),
+                        button -> openLastIncident())
+                .bounds(left, navigationY + 24, buttonWidth, 20)
+                .build());
+        this.lastIncidentButton.active = index != null && index.summary().lastIncident() != null;
         this.exportButton = this.addRenderableWidget(Button.builder(
                         Component.translatable("detective.ui.home.export"),
                         button -> exportLastIncident())
-                .bounds(left, navigationY + 24, secondaryButtonWidth, 20)
+                .bounds(left + buttonWidth + gap, navigationY + 24, buttonWidth, 20)
                 .build());
         this.exportButton.active = index != null && index.summary().lastIncident() != null;
         this.addRenderableWidget(Button.builder(
                         Component.translatable("detective.ui.home.settings"),
                         button -> this.minecraft.setScreen(new DetectiveSettingsScreen(this)))
-                .bounds(left + secondaryButtonWidth + gap, navigationY + 24, secondaryButtonWidth, 20)
+                .bounds(left + (buttonWidth + gap) * 2, navigationY + 24, buttonWidth, 20)
                 .build());
         this.addRenderableWidget(Button.builder(CommonComponents.GUI_BACK, button -> onClose())
                 .bounds(this.width / 2 - 50, this.height - 28, 100, 20)
@@ -88,6 +112,8 @@ public final class DetectiveHomeScreen extends Screen {
     private void refreshData() {
         loading = true;
         loadFailed = false;
+        casesLoading = true;
+        casesLoadFailed = false;
         DetectiveUiService.refreshIndex().whenComplete((loaded, error) -> this.minecraft.execute(() -> {
             if (error != null) {
                 loadFailed = true;
@@ -100,6 +126,13 @@ public final class DetectiveHomeScreen extends Screen {
             }
             if (exportButton != null) {
                 exportButton.active = index != null && index.summary().lastIncident() != null;
+            }
+        }));
+        DetectiveUiService.refreshCases().whenComplete((loaded, error) -> this.minecraft.execute(() -> {
+            casesLoading = false;
+            casesLoadFailed = error != null;
+            if (error == null) {
+                cases = loaded;
             }
         }));
     }
@@ -131,7 +164,7 @@ public final class DetectiveHomeScreen extends Screen {
         int contentY = statusY - (int) scrollOffset;
         int statusHeight = 88;
         int summaryY = contentY + statusHeight + 8;
-        int summaryHeight = index != null && index.unreadableFiles() > 0 ? 130 : 115;
+        int summaryHeight = index != null && index.unreadableFiles() > 0 ? 162 : 147;
         graphics.enableScissor(0, statusY, this.width, navigationY - 3);
         DetectiveUiRenderer.panel(graphics, left, contentY, contentWidth, statusHeight);
         DetectiveUiRenderer.panel(graphics, left, summaryY, contentWidth, summaryHeight);
@@ -199,10 +232,23 @@ public final class DetectiveHomeScreen extends Screen {
                 summary.highEvidenceIncidents() + " / " + summary.moderateEvidenceIncidents());
         drawMetric(graphics, x, y + 92, "detective.ui.home.metric.status",
                 Component.translatable("detective.ui.home.status.monitoring").getString());
+        graphics.drawString(this.font, Component.translatable("detective.ui.home.recurring_patterns"),
+                x, y + 111, DetectiveUiRenderer.ACCENT, false);
+        Component recurring = casesLoading
+                ? Component.translatable("detective.ui.loading")
+                : casesLoadFailed
+                ? Component.translatable("detective.ui.home.recurring_unavailable")
+                : cases == null || cases.isEmpty()
+                ? Component.translatable("detective.ui.cases.empty")
+                : Component.translatable(cases.cases().size() == 1
+                                ? "detective.ui.home.recurring_count.one"
+                                : "detective.ui.home.recurring_count.many",
+                        cases.cases().size());
+        graphics.drawString(this.font, recurring, x, y + 126, DetectiveUiRenderer.MUTED, false);
         if (loaded.unreadableFiles() > 0) {
             graphics.drawString(this.font,
                     Component.translatable("detective.ui.unreadable_files", loaded.unreadableFiles()),
-                    x, y + 107, 0xFFFFAA55, false);
+                    x, y + 147, 0xFFFFAA55, false);
         }
     }
 

@@ -39,6 +39,8 @@ public final class DetectiveSupportService {
     private static final AtomicBoolean INITIALIZATION_REQUESTED = new AtomicBoolean();
     private static final AtomicReference<DetectiveSettings> SETTINGS =
             new AtomicReference<>(DetectiveSettings.defaults());
+    private static final AtomicReference<CaseHistoryService.Result> PREPARED_CASES =
+            new AtomicReference<>();
     private static final IncidentNotificationCooldown NOTIFICATION_COOLDOWN =
             new IncidentNotificationCooldown();
     private static final DetectiveSettingsStore SETTINGS_STORE =
@@ -89,6 +91,22 @@ public final class DetectiveSupportService {
         return SETTINGS.get();
     }
 
+    /** Returns prepared local Case data; any required analysis remains on the support worker. */
+    public static CompletableFuture<CaseHistoryService.Result> preparedCaseHistory() {
+        initializeAsync();
+        return supply(() -> {
+            CaseHistoryService.Result prepared = PREPARED_CASES.get();
+            if (prepared != null) {
+                return prepared;
+            }
+            CaseHistoryService.Result refreshed = refreshCases();
+            if (refreshed == null) {
+                throw new IOException("Local Case analysis is unavailable");
+            }
+            return refreshed;
+        });
+    }
+
     public static CompletableFuture<DetectiveSettings> updateSettings(UnaryOperator<DetectiveSettings> update) {
         Objects.requireNonNull(update, "update");
         initializeAsync();
@@ -103,6 +121,7 @@ public final class DetectiveSupportService {
                 ModDetective.LOGGER.warn("[Detective] Settings were saved, but incident retention failed", e);
             }
             DetectiveUiService.invalidateIndex();
+            DetectiveUiService.invalidateCases();
             return next;
         });
     }
@@ -113,6 +132,7 @@ public final class DetectiveSupportService {
             IncidentHistoryRetention.Result result = IncidentHistoryRetention.clear(ModDetectivePaths.incidents());
             refreshCases();
             DetectiveUiService.invalidateIndex();
+            DetectiveUiService.invalidateCases();
             return result;
         });
     }
@@ -174,6 +194,7 @@ public final class DetectiveSupportService {
                 ModDetective.LOGGER.warn("[Detective] Incident retention failed after recording an incident", e);
             }
             DetectiveUiService.invalidateIndex();
+            DetectiveUiService.invalidateCases();
         });
     }
 
@@ -199,16 +220,20 @@ public final class DetectiveSupportService {
         }
     }
 
-    private static void refreshCases() {
+    private static CaseHistoryService.Result refreshCases() {
+        PREPARED_CASES.set(null);
         try {
             CaseHistoryService.Result result = CASE_HISTORY.refresh();
+            PREPARED_CASES.set(result);
             if (result.unreadableIncidents() > 0 || result.unreadablePersistedCases() > 0) {
                 ModDetective.LOGGER.debug(
                         "[Detective] Case analysis skipped {} unreadable incident(s) and {} unreadable Case record(s)",
                         result.unreadableIncidents(), result.unreadablePersistedCases());
             }
+            return result;
         } catch (IOException | RuntimeException e) {
             ModDetective.LOGGER.warn("[Detective] Local Case analysis could not be refreshed", e);
+            return null;
         }
     }
 

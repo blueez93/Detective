@@ -1,6 +1,8 @@
 package fr.apocalypsebleu.moddetective.client.ui.data;
 
 import fr.apocalypsebleu.moddetective.ModDetective;
+import fr.apocalypsebleu.moddetective.client.support.DetectiveSupportService;
+import fr.apocalypsebleu.moddetective.client.ui.model.CaseIndexViewModel;
 import fr.apocalypsebleu.moddetective.client.ui.model.IncidentDetailViewModel;
 import fr.apocalypsebleu.moddetective.client.ui.model.IncidentIndexViewModel;
 import fr.apocalypsebleu.moddetective.client.ui.model.ModpackChangesViewModel;
@@ -24,6 +26,7 @@ public final class DetectiveUiService {
         return thread;
     });
     private static CompletableFuture<IncidentIndexViewModel> cachedIndex;
+    private static CompletableFuture<CaseIndexViewModel> cachedCases;
 
     private DetectiveUiService() {}
 
@@ -44,6 +47,28 @@ public final class DetectiveUiService {
     public static void invalidateIndex() {
         synchronized (LOCK) {
             cachedIndex = null;
+        }
+    }
+
+    public static CompletableFuture<CaseIndexViewModel> refreshCases() {
+        synchronized (LOCK) {
+            CompletableFuture<IncidentIndexViewModel> incidents = cachedIndex();
+            cachedCases = DetectiveSupportService.preparedCaseHistory()
+                    .thenCombineAsync(incidents, (cases, index) -> CaseUiAdapter.from(
+                            cases, index, ModDetectivePaths.incidents()), WORKER);
+            return cachedCases;
+        }
+    }
+
+    public static CompletableFuture<CaseIndexViewModel> cachedCases() {
+        synchronized (LOCK) {
+            return cachedCases == null ? refreshCases() : cachedCases;
+        }
+    }
+
+    public static void invalidateCases() {
+        synchronized (LOCK) {
+            cachedCases = null;
         }
     }
 
