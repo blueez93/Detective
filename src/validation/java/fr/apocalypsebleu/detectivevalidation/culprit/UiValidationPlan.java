@@ -46,9 +46,26 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /** Development-only screenshot route for the v0.4 investigation and v0.5 support screens. */
 public final class UiValidationPlan {
     private static final String VALIDATION_WORLD = "DetectiveValidation";
+    private static final String PUBLIC_DEMO_PRIMARY_ROUTE = "public-demo";
+    private static final String PUBLIC_DEMO_AMBIGUOUS_ROUTE = "public-demo-ambiguous";
+    private static final String PUBLIC_DEMO_BLACK_BOX_ROUTE = "public-demo-blackbox";
+    private static final String PUBLIC_DEMO_CHANGES_ROUTE = "public-demo-changes";
+    private static final String PUBLIC_DEMO_SUPPORT_REPORT_ROUTE = "public-demo-support-report";
+    private static final String PUBLIC_DEMO_HOME_ROUTE = "public-demo-home";
+    private static final String PUBLIC_DEMO_PRIMARY_SCREENSHOT = "detective-v070-public-demo-incident.png";
+    private static final String PUBLIC_DEMO_AMBIGUOUS_SCREENSHOT =
+            "detective-v070-public-demo-ambiguous.png";
+    private static final String PUBLIC_DEMO_BLACK_BOX_SCREENSHOT =
+            "detective-v070-public-demo-blackbox.png";
+    private static final String PUBLIC_DEMO_CHANGES_SCREENSHOT =
+            "detective-v070-public-demo-modpack-changes.png";
+    private static final String PUBLIC_DEMO_SUPPORT_REPORT_SCREENSHOT =
+            "detective-v070-public-demo-support-report.png";
+    private static final String PUBLIC_DEMO_HOME_SCREENSHOT = "detective-v070-public-demo-home.png";
     private static final AtomicBoolean RUNNING = new AtomicBoolean();
     private static final int WORLD_READINESS_POLLS_BEFORE_FALLBACK = 12;
     private static boolean registered;
+    private static String publicDemoRoute = "";
     private static boolean worldOpenRequested;
     private static int worldReadinessPolls;
     private static long worldReadyNanos;
@@ -58,10 +75,18 @@ public final class UiValidationPlan {
     public static void registerIfRequested() {
         String requested = System.getProperty("detective.validation.autorun", "").trim();
         DetectiveTestCulprit.LOGGER.info("[Detective Validation] UI route property='{}'", requested);
-        if (!"ui".equals(requested) || registered) {
+        boolean publicDemoRequested = isPublicDemoRoute(requested);
+        if (!("ui".equals(requested) || publicDemoRequested) || registered) {
             return;
         }
         registered = true;
+        publicDemoRoute = publicDemoRequested ? requested : "";
+        if (publicDemoRequested) {
+            schedule(() -> start(false), 3_000L);
+            DetectiveTestCulprit.LOGGER.info(
+                    "[Detective Validation] Public screenshot demo scheduled without runtime incident data");
+            return;
+        }
         schedule(UiValidationPlan::pollUntilReady, 1_000L);
         DetectiveTestCulprit.LOGGER.info("[Detective Validation] UI route readiness poll scheduled");
     }
@@ -140,6 +165,10 @@ public final class UiValidationPlan {
             return false;
         }
         DetectiveTestCulprit.LOGGER.info("[Detective Validation] UI screenshot route starting");
+        if (!publicDemoRoute.isEmpty()) {
+            beginPublicDemo();
+            return true;
+        }
         DetectiveUiService.refreshIndex().whenComplete((index, error) -> {
             if (error != null) {
                 DetectiveTestCulprit.LOGGER.error("[Detective Validation] UI data loading failed", error);
@@ -153,6 +182,72 @@ public final class UiValidationPlan {
 
     static boolean isRunning() {
         return RUNNING.get();
+    }
+
+    private static boolean isPublicDemoRoute(String route) {
+        return PUBLIC_DEMO_PRIMARY_ROUTE.equals(route)
+                || PUBLIC_DEMO_AMBIGUOUS_ROUTE.equals(route)
+                || PUBLIC_DEMO_BLACK_BOX_ROUTE.equals(route)
+                || PUBLIC_DEMO_CHANGES_ROUTE.equals(route)
+                || PUBLIC_DEMO_SUPPORT_REPORT_ROUTE.equals(route)
+                || PUBLIC_DEMO_HOME_ROUTE.equals(route);
+    }
+
+    private static void beginPublicDemo() {
+        Minecraft minecraft = Minecraft.getInstance();
+        boolean ambiguous = PUBLIC_DEMO_AMBIGUOUS_ROUTE.equals(publicDemoRoute);
+        boolean blackBox = PUBLIC_DEMO_BLACK_BOX_ROUTE.equals(publicDemoRoute);
+        boolean changes = PUBLIC_DEMO_CHANGES_ROUTE.equals(publicDemoRoute);
+        boolean supportReport = PUBLIC_DEMO_SUPPORT_REPORT_ROUTE.equals(publicDemoRoute);
+        boolean home = PUBLIC_DEMO_HOME_ROUTE.equals(publicDemoRoute);
+        IncidentDetailViewModel demoDetail = changes || supportReport || home
+                ? null
+                : blackBox
+                ? publicDemoBlackBoxDetail()
+                : ambiguous ? publicDemoAmbiguousDetail() : publicDemoDetail();
+        String screenshotName = home
+                ? PUBLIC_DEMO_HOME_SCREENSHOT
+                : supportReport
+                ? PUBLIC_DEMO_SUPPORT_REPORT_SCREENSHOT
+                : changes
+                ? PUBLIC_DEMO_CHANGES_SCREENSHOT
+                : blackBox
+                ? PUBLIC_DEMO_BLACK_BOX_SCREENSHOT
+                : ambiguous ? PUBLIC_DEMO_AMBIGUOUS_SCREENSHOT : PUBLIC_DEMO_PRIMARY_SCREENSHOT;
+        minecraft.options.guiScale().set(2);
+        minecraft.resizeDisplay();
+        minecraft.getLanguageManager().setSelected("en_us");
+        minecraft.reloadResourcePacks().whenComplete((ignored, error) -> {
+            if (error != null) {
+                DetectiveTestCulprit.LOGGER.error(
+                        "[Detective Validation] Could not load public demo resources", error);
+                RUNNING.set(false);
+                return;
+            }
+            if (home) {
+                schedule(() -> Minecraft.getInstance().setScreen(new DetectiveHomeScreen(
+                        Minecraft.getInstance().screen,
+                        IncidentIndexViewModel.empty(
+                                System.currentTimeMillis(), System.currentTimeMillis() - 60_000L))), 500L);
+            } else if (supportReport) {
+                schedule(() -> Minecraft.getInstance().setScreen(new SupportReportCreatedScreen(
+                        Minecraft.getInstance().screen,
+                        Path.of("detective-report-2026-08-12_14-35-00.zip"))), 500L);
+            } else if (changes) {
+                schedule(() -> Minecraft.getInstance().setScreen(new ModpackChangesScreen(
+                        Minecraft.getInstance().screen, publicDemoChanges())), 500L);
+            } else {
+                schedule(() -> Minecraft.getInstance().setScreen(new IncidentDetailScreen(
+                        Minecraft.getInstance().screen, demoDetail)), 500L);
+            }
+            if (ambiguous) {
+                schedule(() -> scrollDetail(-4.5), 1_300L);
+            } else if (blackBox) {
+                schedule(() -> scrollDetail(-13.5), 1_300L);
+            }
+            schedule(() -> screenshot(screenshotName), 2_500L);
+            schedule(UiValidationPlan::complete, 3_500L);
+        });
     }
 
     private static void scheduleScreens(IncidentIndexViewModel index, boolean worldAvailable) {
@@ -385,6 +480,103 @@ public final class UiValidationPlan {
                 : syntheticBlackBox(now);
         return new IncidentDetailViewModel(summary, suspects, blackBox,
                 blackBox.size(), partialBlackBox);
+    }
+
+    private static IncidentDetailViewModel publicDemoDetail() {
+        int samples = 30;
+        long now = System.currentTimeMillis();
+        SuspectViewModel exampleMod = new SuspectViewModel(
+                "example_mod", "Example Mod", "1.0.0", samples, 100.0, 29, 29.0 * 100.0 / samples,
+                1.2, 1, 28, 0, 3);
+        IncidentSummaryViewModel summary = new IncidentSummaryViewModel(
+                "#DEMO", Path.of("public-screenshot-demo.json"), now,
+                621.0, 120.0, samples, EvidenceBadge.HIGH_EVIDENCE, "ATTRIBUTED",
+                "Example Mod", true,
+                "2026-08-12 14:32:08", "Overworld", "128, 64, -342");
+        List<BlackBoxPoint> blackBox = syntheticBlackBox(now);
+        return new IncidentDetailViewModel(
+                summary, List.of(exampleMod), blackBox, blackBox.size(), false,
+                "minecraft:overworld", 128, 64, -342);
+    }
+
+    private static IncidentDetailViewModel publicDemoAmbiguousDetail() {
+        int samples = 30;
+        long now = System.currentTimeMillis();
+        SuspectViewModel exampleModA = new SuspectViewModel(
+                "example_mod_a", "Example Mod A", "1.0.0", 29, 29.0 * 100.0 / samples,
+                14, 14.0 * 100.0 / samples, 1.4, 1, 13, 1, 3);
+        SuspectViewModel exampleModB = new SuspectViewModel(
+                "example_mod_b", "Example Mod B", "1.0.0", 28, 28.0 * 100.0 / samples,
+                13, 13.0 * 100.0 / samples, 1.5, 1, 12, 2, 3);
+        IncidentSummaryViewModel summary = new IncidentSummaryViewModel(
+                "#DEMO", Path.of("public-screenshot-ambiguous-demo.json"), now,
+                478.0, 120.0, samples, EvidenceBadge.AMBIGUOUS_ATTRIBUTION,
+                "AMBIGUOUS_ATTRIBUTION", "", false,
+                "2026-08-12 14:36:42", "Overworld", "128, 64, -342");
+        List<BlackBoxPoint> blackBox = syntheticBlackBox(now);
+        return new IncidentDetailViewModel(
+                summary, List.of(exampleModA, exampleModB), blackBox, blackBox.size(), false,
+                "minecraft:overworld", 128, 64, -342);
+    }
+
+    private static IncidentDetailViewModel publicDemoBlackBoxDetail() {
+        int samples = 30;
+        long now = System.currentTimeMillis();
+        SuspectViewModel exampleMod = new SuspectViewModel(
+                "example_mod", "Example Mod", "1.0.0", samples, 100.0, 29, 29.0 * 100.0 / samples,
+                1.2, 1, 28, 0, 3);
+        IncidentSummaryViewModel summary = new IncidentSummaryViewModel(
+                "#DEMO", Path.of("public-screenshot-blackbox-demo.json"), now,
+                621.0, 120.0, samples, EvidenceBadge.HIGH_EVIDENCE, "ATTRIBUTED",
+                "Example Mod", true,
+                "2026-08-12 14:42:18", "Overworld", "128, 64, -342");
+        List<BlackBoxPoint> blackBox = publicDemoBlackBox(now);
+        return new IncidentDetailViewModel(
+                summary, List.of(exampleMod), blackBox, blackBox.size(), false,
+                "minecraft:overworld", 128, 64, -342);
+    }
+
+    private static List<BlackBoxPoint> publicDemoBlackBox(long incidentEpochMs) {
+        int pointCount = 181;
+        int incidentIndex = pointCount / 2;
+        long startEpochMs = incidentEpochMs - 15_000L;
+        List<BlackBoxPoint> points = new ArrayList<>(pointCount);
+        for (int index = 0; index < pointCount; index++) {
+            double frameMs;
+            if (index == incidentIndex) {
+                frameMs = 621.0;
+            } else if (index == 38 || index == 67 || index == 121 || index == 154) {
+                frameMs = 26.0 + index % 10;
+            } else if (Math.abs(index - incidentIndex) == 1) {
+                frameMs = 31.0;
+            } else if (Math.abs(index - incidentIndex) == 2) {
+                frameMs = 23.0;
+            } else {
+                frameMs = 12.0 + (index % 8) * 0.8;
+            }
+            points.add(new BlackBoxPoint(
+                    startEpochMs + index * 167L,
+                    frameMs,
+                    1_000.0 / frameMs,
+                    (860L + index / 12L) * 1024L * 1024L));
+        }
+        return List.copyOf(points);
+    }
+
+    private static ModpackChangesViewModel publicDemoChanges() {
+        return new ModpackChangesViewModel(true, 42, List.of(
+                new ModpackChangesViewModel.Change(
+                        ModpackChangesViewModel.Type.ADDED,
+                        "example_machines", "Example Machines", "", "1.0.0"),
+                new ModpackChangesViewModel.Change(
+                        ModpackChangesViewModel.Type.ADDED,
+                        "example_worldgen", "Example Worldgen", "", "2.1.0"),
+                new ModpackChangesViewModel.Change(
+                        ModpackChangesViewModel.Type.UPDATED,
+                        "example_storage", "Example Storage", "1.4.2", "1.5.0"),
+                new ModpackChangesViewModel.Change(
+                        ModpackChangesViewModel.Type.REMOVED,
+                        "example_decoration", "Example Decoration", "0.9.4", "")));
     }
 
     private static SuspectViewModel suspect(String modId, String name, int leaf, int samples) {

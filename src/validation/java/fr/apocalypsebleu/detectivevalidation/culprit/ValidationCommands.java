@@ -119,7 +119,9 @@ public final class ValidationCommands {
             case "focus" -> scheduleFocusStudy();
             case "compatibility" -> scheduleCompatibilityCheckpoint();
             case "lifecycle20" -> LifecycleCyclePlan.start();
-            case "ui" -> UiValidationPlan.start(true) || UiValidationPlan.isRunning();
+            case "ui", "public-demo", "public-demo-ambiguous", "public-demo-blackbox",
+                    "public-demo-changes", "public-demo-support-report", "public-demo-home" ->
+                    UiValidationPlan.start(true) || UiValidationPlan.isRunning();
             case "realworld" -> RealWorldValidationPlan.start();
             default -> false;
         };
@@ -136,6 +138,8 @@ public final class ValidationCommands {
                     case "compatibility" -> 24_000L;
                     case "lifecycle20" -> 180_000L;
                     case "ui" -> 80_000L;
+                    case "public-demo", "public-demo-ambiguous", "public-demo-blackbox",
+                            "public-demo-changes", "public-demo-support-report", "public-demo-home" -> 8_000L;
                     default -> 12_000L;
                 };
                 schedule(() -> {
