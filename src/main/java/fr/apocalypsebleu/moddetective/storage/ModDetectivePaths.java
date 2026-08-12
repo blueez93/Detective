@@ -26,6 +26,14 @@ public final class ModDetectivePaths {
         return root().resolve("reports");
     }
 
+    public static Path cases() {
+        return root().resolve("cases");
+    }
+
+    public static Path caseIndex() {
+        return cases().resolve("index.json");
+    }
+
     public static Path settings() {
         return root().resolve("settings.json");
     }
@@ -42,6 +50,7 @@ public final class ModDetectivePaths {
             Files.createDirectories(snapshots());
             Files.createDirectories(incidents());
             Files.createDirectories(reports());
+            Files.createDirectories(cases());
         } catch (IOException e) {
             throw new IllegalStateException("Unable to create Detective data directories", e);
         }

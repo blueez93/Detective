@@ -5,6 +5,7 @@ import fr.apocalypsebleu.moddetective.client.ui.data.DetectiveUiService;
 import fr.apocalypsebleu.moddetective.client.ui.data.IncidentJsonAdapter;
 import fr.apocalypsebleu.moddetective.client.ui.data.ModpackChangesAdapter;
 import fr.apocalypsebleu.moddetective.core.FreezeIncident;
+import fr.apocalypsebleu.moddetective.core.casefile.CaseHistoryService;
 import fr.apocalypsebleu.moddetective.snapshot.ModSnapshot;
 import fr.apocalypsebleu.moddetective.snapshot.ModSnapshotDiff;
 import fr.apocalypsebleu.moddetective.snapshot.ModSnapshotService;
@@ -42,6 +43,8 @@ public final class DetectiveSupportService {
             new IncidentNotificationCooldown();
     private static final DetectiveSettingsStore SETTINGS_STORE =
             new DetectiveSettingsStore(ModDetectivePaths.settings());
+    private static final CaseHistoryService CASE_HISTORY = new CaseHistoryService(
+            ModDetectivePaths.incidents(), ModDetectivePaths.caseIndex());
     private static final ThreadPoolExecutor WORKER = new ThreadPoolExecutor(
             1,
             1,
@@ -75,6 +78,7 @@ public final class DetectiveSupportService {
                     ModDetective.LOGGER.info("[Detective] Incident retention removed {} old record(s)",
                             result.deleted());
                 }
+                refreshCases();
             } catch (IOException | RuntimeException e) {
                 ModDetective.LOGGER.warn("[Detective] Support settings or retention initialization failed; defaults remain active", e);
             }
@@ -94,6 +98,7 @@ public final class DetectiveSupportService {
             SETTINGS.set(next);
             try {
                 IncidentHistoryRetention.apply(ModDetectivePaths.incidents(), next, Instant.now());
+                refreshCases();
             } catch (IOException e) {
                 ModDetective.LOGGER.warn("[Detective] Settings were saved, but incident retention failed", e);
             }
@@ -106,6 +111,7 @@ public final class DetectiveSupportService {
         initializeAsync();
         return supply(() -> {
             IncidentHistoryRetention.Result result = IncidentHistoryRetention.clear(ModDetectivePaths.incidents());
+            refreshCases();
             DetectiveUiService.invalidateIndex();
             return result;
         });
@@ -163,6 +169,7 @@ public final class DetectiveSupportService {
             }
             try {
                 IncidentHistoryRetention.apply(ModDetectivePaths.incidents(), settings, Instant.now());
+                refreshCases();
             } catch (IOException e) {
                 ModDetective.LOGGER.warn("[Detective] Incident retention failed after recording an incident", e);
             }
@@ -189,6 +196,19 @@ public final class DetectiveSupportService {
                     .orElse("unknown");
         } catch (RuntimeException ignored) {
             return "unknown";
+        }
+    }
+
+    private static void refreshCases() {
+        try {
+            CaseHistoryService.Result result = CASE_HISTORY.refresh();
+            if (result.unreadableIncidents() > 0 || result.unreadablePersistedCases() > 0) {
+                ModDetective.LOGGER.debug(
+                        "[Detective] Case analysis skipped {} unreadable incident(s) and {} unreadable Case record(s)",
+                        result.unreadableIncidents(), result.unreadablePersistedCases());
+            }
+        } catch (IOException | RuntimeException e) {
+            ModDetective.LOGGER.warn("[Detective] Local Case analysis could not be refreshed", e);
         }
     }
 

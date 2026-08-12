@@ -22,7 +22,8 @@ class PersistentSchemaVersionTest {
                 List.of(), List.of(), List.of(frame));
 
         assertEquals(FreezeIncident.SCHEMA_VERSION, incident.schemaVersion());
-        assertTrue(GSON.toJson(incident).contains("\"schemaVersion\":1"));
+        assertEquals(2, FreezeIncident.SCHEMA_VERSION);
+        assertTrue(GSON.toJson(incident).contains("\"schemaVersion\":2"));
     }
 
     @Test

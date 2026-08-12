@@ -13,9 +13,10 @@ public record FreezeIncident(
         AttributionEvidence attributionEvidence,
         List<SuspectAnalyzer.Suspect> suspects,
         List<SuspectAnalyzer.HotClass> hotClasses,
-        List<FrameSample> blackBox
+        List<FrameSample> blackBox,
+        DerivedIncidentEvidence derivedEvidence
 ) {
-    public static final int SCHEMA_VERSION = 1;
+    public static final int SCHEMA_VERSION = 2;
 
     public FreezeIncident {
         schemaVersion = SCHEMA_VERSION;
@@ -24,6 +25,22 @@ public record FreezeIncident(
         suspects = List.copyOf(Objects.requireNonNull(suspects, "suspects"));
         hotClasses = List.copyOf(Objects.requireNonNull(hotClasses, "hotClasses"));
         blackBox = List.copyOf(Objects.requireNonNull(blackBox, "blackBox"));
+    }
+
+    public FreezeIncident(
+            int schemaVersion,
+            long detectedAtEpochMs,
+            double durationMs,
+            double thresholdMs,
+            FrameSample frame,
+            int watchdogSamples,
+            AttributionEvidence attributionEvidence,
+            List<SuspectAnalyzer.Suspect> suspects,
+            List<SuspectAnalyzer.HotClass> hotClasses,
+            List<FrameSample> blackBox
+    ) {
+        this(schemaVersion, detectedAtEpochMs, durationMs, thresholdMs, frame, watchdogSamples,
+                attributionEvidence, suspects, hotClasses, blackBox, null);
     }
 
     public FreezeIncident(
@@ -38,6 +55,22 @@ public record FreezeIncident(
             List<FrameSample> blackBox
     ) {
         this(SCHEMA_VERSION, detectedAtEpochMs, durationMs, thresholdMs, frame, watchdogSamples,
-                attributionEvidence, suspects, hotClasses, blackBox);
+                attributionEvidence, suspects, hotClasses, blackBox, null);
+    }
+
+    public FreezeIncident(
+            long detectedAtEpochMs,
+            double durationMs,
+            double thresholdMs,
+            FrameSample frame,
+            int watchdogSamples,
+            AttributionEvidence attributionEvidence,
+            List<SuspectAnalyzer.Suspect> suspects,
+            List<SuspectAnalyzer.HotClass> hotClasses,
+            List<FrameSample> blackBox,
+            DerivedIncidentEvidence derivedEvidence
+    ) {
+        this(SCHEMA_VERSION, detectedAtEpochMs, durationMs, thresholdMs, frame, watchdogSamples,
+                attributionEvidence, suspects, hotClasses, blackBox, derivedEvidence);
     }
 }

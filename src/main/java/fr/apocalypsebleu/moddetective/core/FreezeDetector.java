@@ -122,6 +122,7 @@ public final class FreezeDetector implements AutoCloseable {
         try {
             SuspectAnalyzer.Analysis analysis = analyzer.analyze(stacks);
             AttributionEvidence evidence = AttributionEvidenceClassifier.classify(stacks, analysis);
+            DerivedIncidentEvidence derivedEvidence = DerivedIncidentEvidence.capture(stacks, analysis);
             FreezeIncident incident = new FreezeIncident(
                     frame.epochMs(),
                     frame.frameMs(),
@@ -131,7 +132,8 @@ public final class FreezeDetector implements AutoCloseable {
                     evidence,
                     analysis.suspects(),
                     analysis.hotClasses(),
-                    history);
+                    history,
+                    derivedEvidence);
 
             Path saved = IncidentStore.save(incident);
             logIncident(incident, saved);
