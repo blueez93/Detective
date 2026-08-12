@@ -1,8 +1,8 @@
 # Changelog
 
-## 0.7.0-alpha.1
+## 0.7.0
 
-First public Early Alpha preparation for Minecraft 1.21.1 and NeoForge.
+First public release for Minecraft 1.21.1 and NeoForge.
 
 ### Included
 

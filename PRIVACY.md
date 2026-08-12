@@ -48,4 +48,4 @@ Report data is assembled from an explicit allow-list and receives additional red
 
 No automated filter can guarantee that every future or unexpectedly formatted value is harmless. Review a Support Report before posting it publicly, especially when it contains metadata supplied by third-party mods.
 
-If optional log attachment is added in a future version, it must be an explicit choice with a separate warning. Detective 0.7.0-alpha.1 does not automatically include Minecraft logs.
+If optional log attachment is added in a future version, it must be an explicit choice with a separate warning. Detective 0.7.0 does not automatically include Minecraft logs.

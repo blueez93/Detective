@@ -14,7 +14,7 @@ Detective is a client-side Minecraft mod that records evidence around freezes an
 
 Detective ranks suspects from captured execution evidence. A Primary Suspect is not proof that a mod is defective or solely responsible: configuration, game state, another mod, or an interaction between components may also matter.
 
-## EARLY ALPHA
+## Release status
 
 Detective's core detection, attribution, UI, and Support Reports have been validated, including a smoke test with **257 loaded mod IDs**.
 
@@ -45,7 +45,7 @@ Requirements:
 Steps:
 
 1. Install NeoForge for Minecraft 1.21.1.
-2. Place `detective-0.7.0-alpha.1.jar` in the client instance's `mods` folder.
+2. Place `detective-0.7.0.jar` in the client instance's `mods` folder.
 3. Start Minecraft and open Detective from the title screen or pause menu.
 
 No server installation is required. NeoForge **21.1.248** is the recommended tested runtime; a later compatible 21.1.x version may work, but versions not listed below have not been independently validated by the project.
