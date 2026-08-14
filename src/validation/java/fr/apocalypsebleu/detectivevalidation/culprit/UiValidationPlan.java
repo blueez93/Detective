@@ -3,6 +3,7 @@ package fr.apocalypsebleu.detectivevalidation.culprit;
 import fr.apocalypsebleu.moddetective.client.ui.DetectiveHomeScreen;
 import fr.apocalypsebleu.moddetective.client.ui.IncidentDetailScreen;
 import fr.apocalypsebleu.moddetective.client.ui.IncidentListScreen;
+import fr.apocalypsebleu.moddetective.client.ui.IncidentComparisonScreen;
 import fr.apocalypsebleu.moddetective.client.ui.ModpackChangesScreen;
 import fr.apocalypsebleu.moddetective.client.ui.ExportSupportReportScreen;
 import fr.apocalypsebleu.moddetective.client.ui.SupportReportCreatedScreen;
@@ -61,6 +62,15 @@ public final class UiValidationPlan {
     private static final String CASE_FILE_MIXED_ROUTE = "case-file-mixed";
     private static final String CASE_FILES_LEGACY_ROUTE = "case-files-legacy";
     private static final String CASE_FILES_HOME_ROUTE = "case-files-home";
+    private static final String INCIDENT_SEARCH_ROUTE = "incident-search";
+    private static final String INCIDENT_SEARCH_EMPTY_ROUTE = "incident-search-empty";
+    private static final String INCIDENT_FILTERS_ROUTE = "incident-filters";
+    private static final String INCIDENT_COMPARE_SELECT_ROUTE = "incident-compare-select";
+    private static final String INCIDENT_COMPARISON_HIGH_ROUTE = "incident-comparison-high";
+    private static final String INCIDENT_COMPARISON_LOW_ROUTE = "incident-comparison-low";
+    private static final String INCIDENT_COMPARISON_LEGACY_ROUTE = "incident-comparison-legacy";
+    private static final String INCIDENT_COMPARISON_INSUFFICIENT_ROUTE =
+            "incident-comparison-insufficient";
     private static final String PUBLIC_DEMO_PRIMARY_SCREENSHOT = "detective-v070-public-demo-incident.png";
     private static final String PUBLIC_DEMO_AMBIGUOUS_SCREENSHOT =
             "detective-v070-public-demo-ambiguous.png";
@@ -200,7 +210,19 @@ public final class UiValidationPlan {
                 || PUBLIC_DEMO_CHANGES_ROUTE.equals(route)
                 || PUBLIC_DEMO_SUPPORT_REPORT_ROUTE.equals(route)
                 || PUBLIC_DEMO_HOME_ROUTE.equals(route)
+                || isIncidentInvestigationRoute(route)
                 || isCaseFileRoute(route);
+    }
+
+    private static boolean isIncidentInvestigationRoute(String route) {
+        return INCIDENT_SEARCH_ROUTE.equals(route)
+                || INCIDENT_SEARCH_EMPTY_ROUTE.equals(route)
+                || INCIDENT_FILTERS_ROUTE.equals(route)
+                || INCIDENT_COMPARE_SELECT_ROUTE.equals(route)
+                || INCIDENT_COMPARISON_HIGH_ROUTE.equals(route)
+                || INCIDENT_COMPARISON_LOW_ROUTE.equals(route)
+                || INCIDENT_COMPARISON_LEGACY_ROUTE.equals(route)
+                || INCIDENT_COMPARISON_INSUFFICIENT_ROUTE.equals(route);
     }
 
     private static boolean isCaseFileRoute(String route) {
@@ -214,6 +236,10 @@ public final class UiValidationPlan {
     }
 
     private static void beginPublicDemo() {
+        if (isIncidentInvestigationRoute(publicDemoRoute)) {
+            beginIncidentInvestigationDemo();
+            return;
+        }
         if (isCaseFileRoute(publicDemoRoute)) {
             beginCaseFileDemo();
             return;
@@ -268,6 +294,66 @@ public final class UiValidationPlan {
                 schedule(() -> scrollDetail(-4.5), 1_300L);
             } else if (blackBox) {
                 schedule(() -> scrollDetail(-13.5), 1_300L);
+            }
+            schedule(() -> screenshot(screenshotName), 2_500L);
+            schedule(UiValidationPlan::complete, 3_500L);
+        });
+    }
+
+    private static void beginIncidentInvestigationDemo() {
+        Minecraft minecraft = Minecraft.getInstance();
+        minecraft.options.guiScale().set(2);
+        minecraft.resizeDisplay();
+        minecraft.getLanguageManager().setSelected("en_us");
+        minecraft.reloadResourcePacks().whenComplete((ignored, error) -> {
+            if (error != null) {
+                DetectiveTestCulprit.LOGGER.error(
+                        "[Detective Validation] Could not load investigation demo resources", error);
+                RUNNING.set(false);
+                return;
+            }
+            String screenshotName = "detective-v090-" + publicDemoRoute + ".png";
+            schedule(() -> {
+                Screen parent = Minecraft.getInstance().screen;
+                switch (publicDemoRoute) {
+                    case INCIDENT_SEARCH_ROUTE -> Minecraft.getInstance().setScreen(
+                            new IncidentListScreen(parent,
+                                    IncidentInvestigationValidationFixtures.searchResults()));
+                    case INCIDENT_SEARCH_EMPTY_ROUTE -> Minecraft.getInstance().setScreen(
+                            new IncidentListScreen(parent,
+                                    IncidentInvestigationValidationFixtures.emptySearchResults()));
+                    case INCIDENT_FILTERS_ROUTE -> Minecraft.getInstance().setScreen(
+                            new IncidentListScreen(parent,
+                                    IncidentInvestigationValidationFixtures.activeFilters()));
+                    case INCIDENT_COMPARE_SELECT_ROUTE -> Minecraft.getInstance().setScreen(
+                            new IncidentListScreen(parent,
+                                    IncidentInvestigationValidationFixtures.comparisonSelection()));
+                    case INCIDENT_COMPARISON_HIGH_ROUTE -> Minecraft.getInstance().setScreen(
+                            new IncidentComparisonScreen(parent,
+                                    IncidentInvestigationValidationFixtures.highComparison()));
+                    case INCIDENT_COMPARISON_LOW_ROUTE -> Minecraft.getInstance().setScreen(
+                            new IncidentComparisonScreen(parent,
+                                    IncidentInvestigationValidationFixtures.lowComparison()));
+                    case INCIDENT_COMPARISON_LEGACY_ROUTE -> Minecraft.getInstance().setScreen(
+                            new IncidentComparisonScreen(parent,
+                                    IncidentInvestigationValidationFixtures.legacyComparison()));
+                    case INCIDENT_COMPARISON_INSUFFICIENT_ROUTE -> Minecraft.getInstance().setScreen(
+                            new IncidentComparisonScreen(parent,
+                                    IncidentInvestigationValidationFixtures.insufficientComparison()));
+                    default -> throw new IllegalStateException(
+                            "Unknown Incident Investigation route: " + publicDemoRoute);
+                }
+            }, 500L);
+            if (INCIDENT_COMPARISON_HIGH_ROUTE.equals(publicDemoRoute)) {
+                schedule(() -> scrollCurrentScreen(-3.0), 1_500L);
+                schedule(() -> screenshot(screenshotName), 2_500L);
+                schedule(() -> scrollCurrentScreen(-6.0), 2_800L);
+                schedule(() -> screenshot("detective-v090-incident-comparison-high-b.png"), 3_800L);
+                schedule(UiValidationPlan::complete, 4_800L);
+                return;
+            }
+            if (INCIDENT_COMPARISON_LEGACY_ROUTE.equals(publicDemoRoute)) {
+                schedule(() -> scrollCurrentScreen(-8.0), 1_500L);
             }
             schedule(() -> screenshot(screenshotName), 2_500L);
             schedule(UiValidationPlan::complete, 3_500L);

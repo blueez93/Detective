@@ -46,6 +46,13 @@ class LocalizationCopyTest {
         assertEquals("A recurring pattern indicates repeated technical similarity between incidents. "
                         + "It does not prove that a mod is defective or solely responsible.",
                 english.get("detective.ui.case.safety"));
+        assertEquals("Search incidents…",
+                english.get("detective.ui.incidents.search.hint"));
+        assertEquals("Technical similarity compares captured evidence. It does not establish "
+                        + "a shared cause or prove that a mod is defective or solely responsible.",
+                english.get("detective.ui.comparison.caution"));
+        assertEquals("Technical signature #%s",
+                english.get("detective.ui.comparison.evidence.signature"));
     }
 
     @Test
@@ -65,6 +72,8 @@ class LocalizationCopyTest {
             assertFalse(french.contains(forbidden), () -> "Forbidden French UI copy: " + forbidden);
         }
         assertTrue(french.contains("suspect principal"));
+        assertTrue(language("fr_fr").get("detective.ui.comparison.caution")
+                .contains("ne prouve pas"));
     }
 
     private static Map<String, String> language(String code) throws IOException {
