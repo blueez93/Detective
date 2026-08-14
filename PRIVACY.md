@@ -17,7 +17,9 @@ Minecraft, NeoForge, launchers, and other installed mods may have their own netw
 
 ## Local data
 
-Detective stores its settings, mod snapshots, Incident records, Case index, and generated Support Reports under the Minecraft instance's local `detective` data directory.
+Detective stores its settings, mod snapshots, bounded Modpack Launch History, Incident records, Case index, and generated Support Reports under the Minecraft instance's local `detective` data directory.
+
+`launch-history.json` remains local. It contains observed launch timestamps and bounded added, updated, or removed mod metadata: change type, mod ID, display name, and applicable previous/new versions. It does not contain player identity, server addresses, raw stack dumps, or personal filesystem paths. The default retained history is 64 launch records, and it cannot reconstruct launches or changes Detective did not observe.
 
 For new Incidents, Case Files may persist bounded counts and truncated SHA-256 signatures derived from normalized class, frame, and stack-path symbols already observed by the watchdog, plus bounded mod-owner observations. These derived signatures do not add full raw thread dumps, source filenames, line numbers, thread names, object values, player data, or arbitrary runtime text.
 
@@ -37,6 +39,8 @@ A standard report may contain:
 
 Standard reports do **not** include:
 
+- `launch-history.json`;
+- the Case database/index;
 - `latest.log`;
 - mod JARs, worlds, screenshots, or memory dumps;
 - Minecraft account names, UUIDs, sessions, or access tokens;
@@ -50,4 +54,4 @@ Report data is assembled from an explicit allow-list and receives additional red
 
 No automated filter can guarantee that every future or unexpectedly formatted value is harmless. Review a Support Report before posting it publicly, especially when it contains metadata supplied by third-party mods.
 
-If optional log attachment is added in a future version, it must be an explicit choice with a separate warning. Detective 0.8.0 does not automatically include Minecraft logs.
+If optional log attachment is added in a future version, it must be an explicit choice with a separate warning. Detective 0.9.0 does not automatically include Minecraft logs.

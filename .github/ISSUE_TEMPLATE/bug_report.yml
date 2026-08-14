@@ -13,7 +13,7 @@ body:
     id: detective_version
     attributes:
       label: Detective version
-      placeholder: 0.8.0
+      placeholder: 0.9.0
     validations:
       required: true
 
@@ -64,7 +64,7 @@ body:
     id: support_report
     attributes:
       label: Detective Support Report
-      description: Attach a Support Report if available. Inspect its contents before sharing. Do not attach latest.log automatically or include private information.
+      description: Attach a Support Report if available. Inspect its contents before sharing. Support Reports do not automatically include launch-history.json, the Case index, or latest.log; do not add private information.
     validations:
       required: false
 

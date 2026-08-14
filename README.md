@@ -16,7 +16,7 @@ Detective ranks suspects from captured execution evidence. A Primary Suspect is 
 
 ## Release status
 
-Detective's core detection, attribution, UI, and Support Reports have been validated, including a smoke test with **257 loaded mod IDs**.
+Detective's core detection, attribution, Investigation UI, and Support Reports have been validated. The 0.9.0 release completed **273 tests** and **43 isolated NeoForge client startups**, in addition to the existing compatibility smoke with **257 loaded mod IDs**.
 
 Long-duration validation on Medium, Large, and Stress modpacks is still ongoing. Users should keep backups and report unexpected behavior.
 
@@ -29,8 +29,18 @@ Long-duration validation on Medium, Large, and Stress modpacks is still ongoing.
 - **Ambiguous Attribution** — explicitly declines to choose one mod when several suspects have similar evidence.
 - **Honest unknown states** — distinguishes insufficient evidence and possible JVM, GC, native, or driver stalls instead of inventing a named suspect.
 - **Modpack Changes** — compares installed mod names and versions with the previous recorded launch.
+- **Incident Investigation** — searches and filters retained Incidents and compares two captures side by side.
+- **What Changed?** — reviews Case Evolution and recorded modpack changes near the first retained occurrence.
 - **Support Reports** — exports a lightweight local ZIP with human-readable summaries and schema-versioned JSON.
 - **Daily-use controls** — optional Incident notifications, bounded history retention, and essential settings.
+
+### Incident Investigation
+
+Detective can search and filter retained Incidents, then compare two captures using a deterministic Technical Similarity score derived from the evidence both files support. Technical evidence carries more weight than contextual values such as duration, and a previous Primary Suspect is not used as a shortcut for declaring two Incidents similar.
+
+Case Evolution adds a **What Changed?** view for recurring Cases. It shows the earliest supported occurrence in retained local history and any recorded modpack changes nearby. “First recorded occurrence” is not “first ever occurrence,” and temporal proximity does not establish causation.
+
+Detective keeps a bounded local history of observed launch boundaries and added, updated, or removed mod versions for this analysis. The history is not retroactive.
 
 ### Case Files
 
@@ -51,7 +61,7 @@ Requirements:
 Steps:
 
 1. Install NeoForge for Minecraft 1.21.1.
-2. Place `detective-0.8.0.jar` in the client instance's `mods` folder.
+2. Place `detective-0.9.0.jar` in the client instance's `mods` folder.
 3. Start Minecraft and open Detective from the title screen or pause menu.
 
 No server installation is required. NeoForge **21.1.248** is the recommended tested runtime; a later compatible 21.1.x version may work, but versions not listed below have not been independently validated by the project.
@@ -85,7 +95,7 @@ Use **Export Support Report** from an Incident detail or the Detective dashboard
 
 Detective stores its data locally under the game instance's `detective` directory. It contains no telemetry, analytics, automatic uploads, remote API calls, or update checker.
 
-Standard Support Reports do not include `latest.log`, JARs, saves, screenshots, memory dumps, account/session data, server addresses, or personal paths. See [PRIVACY.md](PRIVACY.md) for the complete policy.
+Standard Support Reports do not include `launch-history.json`, the Case database/index, `latest.log`, JARs, saves, screenshots, memory dumps, account/session data, server addresses, or personal paths. See [PRIVACY.md](PRIVACY.md) for the complete policy.
 
 ## License
 
@@ -96,6 +106,8 @@ Detective is distributed under the **Detective Proprietary License 1.0**. See [L
 - Long-duration Medium/Large/Stress modpack soaks are not yet complete.
 - A short compatibility smoke passed with 166 physical JARs and 257 loaded mod IDs, but it is not a substitute for a long stable soak.
 - Physical Alt+Tab, the full resolution/GUI-scale matrix, keyboard navigation, and `Open Folder` behavior still require final human validation.
+- Incident, Case, and launch histories are intentionally bounded, so “first recorded occurrence” is limited to retained local evidence.
+- Launch History is not retroactive, and legacy Incidents may contain less evidence for Technical Similarity than newer captures.
 - Detective can only explain the evidence it captures; some stalls remain ambiguous, system-related, or unknown.
 
 ## Reporting a bug

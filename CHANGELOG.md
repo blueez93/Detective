@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.9.0
+
+### Incident Investigation
+
+- Added an Incident Investigation workflow for searching, filtering, selecting, and comparing retained Incidents.
+- Added deterministic Incident Search & Filters across supported Incident metadata and captured evidence, with explicit empty and insufficient-evidence states.
+- Added side-by-side Incident Comparison with normalized Technical Similarity derived from captured evidence. A similar score does not prove a shared cause or that a mod is defective.
+- Added **What Changed? / Case Evolution** to show how a recurring Case developed across retained Incidents and which recorded modpack changes occurred nearby.
+- “First recorded occurrence” means the earliest supported occurrence in Detective's retained local history, not the first time the pattern ever happened.
+- Nearby modpack changes are presented as temporal context only. Temporal proximity does not establish causation.
+
+### Local history and interface
+
+- Added a bounded, local Modpack Launch History that records observed launch boundaries and added, updated, or removed mod versions for future Case Evolution analysis. It is not retroactive.
+- Added precise wheel scrolling, visible scroll tracks, and draggable vertical scrollbars for long Investigation, Comparison, and Case Evolution screens.
+- Preserved deterministic Case identity, complete-link clustering safety, existing attribution semantics, freeze detection, render-thread sampling, and Support Report behavior.
+- Kept legacy 0.7/0.8 Incident histories usable; older Incidents may provide less comparable technical evidence because information that was never captured is not fabricated.
+
+### Privacy and compatibility
+
+- Investigation and launch-history processing remain client-side and local, with no telemetry, networking, or automatic uploads.
+- `launch-history.json` is bounded to 64 retained launch records by default and stores timestamps plus compact mod change metadata. It does not add raw stack dumps, player identity, server addresses, or personal file paths.
+- Support Reports remain explicit allow-list exports and do not automatically include `launch-history.json`, the Case database/index, or `latest.log`.
+- Final release-candidate validation: 273 tests passed with 0 failures, 0 errors, and 0 skipped; 43 isolated NeoForge client startups completed successfully.
+
+Technical Similarity, attribution, recurring patterns, and nearby changes describe captured evidence. They do not establish causation or prove that a mod is defective.
+
 ## 0.8.0
 
 ### Case Files
