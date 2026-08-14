@@ -1,5 +1,6 @@
 package fr.apocalypsebleu.moddetective.snapshot;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import fr.apocalypsebleu.moddetective.client.ui.data.evolution.ModpackChangeHistory;
@@ -160,6 +161,22 @@ class ModpackLaunchHistoryStoreTest {
     }
 
     @Test
+    void emptyValidHistoryLoadsWithoutFabrication() throws IOException {
+        String empty = """
+                {"schemaVersion":1,"earlierHistoryUnavailable":false,
+                 "omittedEarlierRecords":0,"records":[]}
+                """;
+        Files.writeString(target(), empty);
+
+        ModpackLaunchHistoryStore.LoadResult result = store(target()).load();
+
+        assertEquals(ModpackLaunchHistoryStore.LoadStatus.LOADED, result.status());
+        assertTrue(result.history().records().isEmpty());
+        assertFalse(result.history().earlierHistoryUnavailable());
+        assertEquals(empty, Files.readString(target()));
+    }
+
+    @Test
     void corruptHistoryIsPreservedAndCurrentLaunchStaysInMemoryOnly() throws IOException {
         Files.writeString(target(), "{\"schemaVersion\":1,\"records\":[");
         String original = Files.readString(target());
@@ -271,6 +288,54 @@ class ModpackLaunchHistoryStoreTest {
     }
 
     @Test
+    void excessiveHostileRecordCountIsRejectedAndPreserved() throws IOException {
+        JsonObject root = validRoot();
+        JsonArray records = root.getAsJsonArray("records");
+        for (int index = 0; index <= ModpackLaunchHistory.ABSOLUTE_MAXIMUM_RECORDS; index++) {
+            JsonObject record = new JsonObject();
+            record.addProperty("launchAtEpochMs", index);
+            record.add("changes", new JsonArray());
+            records.add(record);
+        }
+        String excessive = root.toString();
+        Files.writeString(target(), excessive);
+
+        ModpackLaunchHistoryStore.RecordResult result = store(target()).record(record(200L));
+
+        assertEquals(ModpackLaunchHistoryStore.LoadStatus.CORRUPT, result.sourceStatus());
+        assertFalse(result.written());
+        assertFalse(result.currentLaunchPersisted());
+        assertEquals(excessive, Files.readString(target()));
+    }
+
+    @Test
+    void excessiveChangesInOneLaunchAreRejectedAndPreserved() throws IOException {
+        JsonObject root = validRoot();
+        JsonObject record = new JsonObject();
+        record.addProperty("launchAtEpochMs", 1L);
+        JsonArray changes = new JsonArray();
+        for (int index = 0; index <= ModpackLaunchRecord.MAXIMUM_CHANGES_PER_LAUNCH; index++) {
+            JsonObject change = new JsonObject();
+            change.addProperty("type", "ADDED");
+            change.addProperty("modId", "mod-" + index);
+            change.addProperty("modDisplayName", "Mod " + index);
+            change.addProperty("newVersion", "1.0");
+            changes.add(change);
+        }
+        record.add("changes", changes);
+        root.getAsJsonArray("records").add(record);
+        String excessive = root.toString();
+        Files.writeString(target(), excessive);
+
+        ModpackLaunchHistoryStore.RecordResult result = store(target()).record(record(210L));
+
+        assertEquals(ModpackLaunchHistoryStore.LoadStatus.CORRUPT, result.sourceStatus());
+        assertFalse(result.written());
+        assertFalse(result.currentLaunchPersisted());
+        assertEquals(excessive, Files.readString(target()));
+    }
+
+    @Test
     void persistedHistoryMapsToPartialCaseEvolutionCoverageAfterEviction() throws IOException {
         ModpackLaunchHistoryStore store = store(target());
         for (int index = 1; index <= 65; index++) {
@@ -332,6 +397,15 @@ class ModpackLaunchHistoryStoreTest {
 
     private Path target() {
         return temporaryDirectory.resolve("launch-history.json");
+    }
+
+    private static JsonObject validRoot() {
+        JsonObject root = new JsonObject();
+        root.addProperty("schemaVersion", ModpackLaunchHistoryStore.SCHEMA_VERSION);
+        root.addProperty("earlierHistoryUnavailable", true);
+        root.addProperty("omittedEarlierRecords", 0L);
+        root.add("records", new JsonArray());
+        return root;
     }
 
     private static ModpackLaunchHistoryStore store(Path target) {

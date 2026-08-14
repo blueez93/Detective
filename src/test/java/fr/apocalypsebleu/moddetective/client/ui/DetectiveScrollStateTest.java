@@ -26,6 +26,15 @@ class DetectiveScrollStateTest {
     }
 
     @Test
+    void contentExactlyFittingViewportHasNoScrollbar() {
+        DetectiveScrollState state = configured(100, 100);
+
+        assertFalse(state.isScrollbarVisible());
+        assertEquals(0.0, state.maximumOffset());
+        assertFalse(state.scrollWheel(-1.0));
+    }
+
+    @Test
     void offsetClampsAtZero() {
         DetectiveScrollState state = configured(500, 100);
 
@@ -53,6 +62,16 @@ class DetectiveScrollStateTest {
         assertEquals(24.0, state.offset());
         state.scrollWheel(0.5);
         assertEquals(18.0, state.offset());
+    }
+
+    @Test
+    void fastWheelInputRemainsClampedAtBothEnds() {
+        DetectiveScrollState state = configured(500, 100);
+
+        assertTrue(state.scrollWheel(-1_000.0));
+        assertEquals(state.maximumOffset(), state.offset());
+        assertTrue(state.scrollWheel(1_000.0));
+        assertEquals(0.0, state.offset());
     }
 
     @Test
@@ -99,6 +118,20 @@ class DetectiveScrollStateTest {
     }
 
     @Test
+    void draggingThumbBeyondTrackClampsToTopAndBottom() {
+        DetectiveScrollState state = configured(500, 100);
+        DetectiveScrollState.ScrollbarGeometry initial = state.geometry();
+        double grabY = initial.thumbTop() + initial.thumbHeight() / 2.0;
+
+        assertTrue(state.mouseClicked(initial.trackX(), grabY, 0));
+        assertTrue(state.mouseDragged(initial.trackTop() + initial.trackHeight() + 1_000.0, 0));
+        assertEquals(state.maximumOffset(), state.offset());
+        assertTrue(state.mouseDragged(initial.trackTop() - 1_000.0, 0));
+        assertEquals(0.0, state.offset());
+        assertTrue(state.mouseReleased(0));
+    }
+
+    @Test
     void trackClickMovesOneBoundedPageTowardPointer() {
         DetectiveScrollState state = configured(500, 100);
         DetectiveScrollState.ScrollbarGeometry geometry = state.geometry();
@@ -111,6 +144,32 @@ class DetectiveScrollStateTest {
     }
 
     @Test
+    void trackClicksAboveAndBelowMoveOnlyTowardThePointer() {
+        DetectiveScrollState state = configured(500, 100);
+        state.scrollTo(200.0);
+        DetectiveScrollState.ScrollbarGeometry geometry = state.geometry();
+
+        assertTrue(state.mouseClicked(geometry.trackX(), geometry.trackTop() + 1, 0));
+        assertEquals(115.0, state.offset());
+        geometry = state.geometry();
+        assertTrue(state.mouseClicked(
+                geometry.trackX(), geometry.trackTop() + geometry.trackHeight() - 1, 0));
+        assertEquals(200.0, state.offset());
+    }
+
+    @Test
+    void clicksOutsideTrackOrWithAnotherButtonAreNotConsumed() {
+        DetectiveScrollState state = configured(500, 100);
+        DetectiveScrollState.ScrollbarGeometry geometry = state.geometry();
+
+        assertFalse(state.mouseClicked(geometry.trackX() - 3, geometry.trackTop() + 50, 0));
+        assertFalse(state.mouseClicked(geometry.trackX(), geometry.trackTop() - 1, 0));
+        assertFalse(state.mouseClicked(geometry.trackX(), geometry.trackTop() + 50, 1));
+        assertEquals(0.0, state.offset());
+        assertFalse(state.isDragging());
+    }
+
+    @Test
     void resizeRecomputePreservesALegalOffset() {
         DetectiveScrollState state = configured(1_000, 200);
         state.scrollTo(700.0);
@@ -119,6 +178,25 @@ class DetectiveScrollStateTest {
 
         assertEquals(500.0, state.offset());
         assertEquals(500.0, state.maximumOffset());
+    }
+
+    @Test
+    void repeatedResizeNeverLeavesStaleDragOrIllegalOffset() {
+        DetectiveScrollState state = configured(1_000, 100);
+        DetectiveScrollState.ScrollbarGeometry geometry = state.geometry();
+        assertTrue(state.mouseClicked(
+                geometry.trackX(), geometry.thumbTop() + geometry.thumbHeight() / 2.0, 0));
+        state.scrollToBottom();
+
+        state.updateLayout(1_000, 30, 400, 620, 4);
+        assertTrue(state.offset() <= state.maximumOffset());
+        state.updateLayout(80, 30, 100, 620, 4);
+        assertEquals(0.0, state.offset());
+        assertFalse(state.isScrollbarVisible());
+        assertFalse(state.isDragging());
+        state.updateLayout(900, 30, 120, 620, 4);
+        assertEquals(0.0, state.offset());
+        assertTrue(state.isScrollbarVisible());
     }
 
     @Test

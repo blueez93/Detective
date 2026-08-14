@@ -234,6 +234,37 @@ class IncidentComparisonEngineTest {
         assertTrue(result.technicalSimilarity().score().isPresent());
     }
 
+    @Test
+    void benchmarkPairwiseEnhancedIncidentComparison() {
+        FreezeIncident first = enhanced(
+                1_000L, 400.0, AttributionEvidence.State.ATTRIBUTED, "alpha",
+                List.of(hash('a'), hash('b')), List.of(hash('c')), List.of(hash('d')));
+        FreezeIncident second = enhanced(
+                2_000L, 500.0, AttributionEvidence.State.AMBIGUOUS_ATTRIBUTION, "beta",
+                List.of(hash('a'), hash('e')), List.of(hash('c')), List.of(hash('f')));
+        for (int warmup = 0; warmup < 1_000; warmup++) {
+            engine.compare("first", first, "second", second);
+        }
+        int comparisonsPerSample = 500;
+        long[] samples = new long[31];
+        double checksum = 0.0;
+        for (int sample = 0; sample < samples.length; sample++) {
+            long started = System.nanoTime();
+            for (int comparison = 0; comparison < comparisonsPerSample; comparison++) {
+                checksum += engine.compare("first", first, "second", second)
+                        .technicalSimilarity().score().orElseThrow();
+            }
+            samples[sample] = System.nanoTime() - started;
+        }
+        java.util.Arrays.sort(samples);
+        assertTrue(checksum > 0.0);
+        System.out.printf(
+                "INCIDENT_COMPARISON_BENCHMARK evidence=enhanced pairs=%d median=%.6fms thread=%s%n",
+                comparisonsPerSample,
+                samples[samples.length / 2] / 1_000_000.0 / comparisonsPerSample,
+                Thread.currentThread().getName());
+    }
+
     private static FreezeIncident enhanced(
             long detectedAt,
             double duration,
