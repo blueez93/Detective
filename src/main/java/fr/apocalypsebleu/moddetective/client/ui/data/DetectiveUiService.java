@@ -12,6 +12,11 @@ import fr.apocalypsebleu.moddetective.client.ui.data.query.IncidentQuery;
 import fr.apocalypsebleu.moddetective.client.ui.data.query.IncidentQueryEngine;
 import fr.apocalypsebleu.moddetective.client.ui.data.query.IncidentQueryResult;
 import fr.apocalypsebleu.moddetective.client.ui.data.query.IncidentSearchHistory;
+import fr.apocalypsebleu.moddetective.client.ui.data.evolution.CaseEvolution;
+import fr.apocalypsebleu.moddetective.client.ui.data.evolution.CaseEvolutionEngine;
+import fr.apocalypsebleu.moddetective.client.ui.data.evolution.ModpackChangeHistory;
+import fr.apocalypsebleu.moddetective.client.ui.data.evolution.RetainedHistoryCoverage;
+import fr.apocalypsebleu.moddetective.core.casefile.CaseFile;
 import fr.apocalypsebleu.moddetective.snapshot.ModSnapshotService;
 import fr.apocalypsebleu.moddetective.storage.ModDetectivePaths;
 
@@ -26,6 +31,7 @@ public final class DetectiveUiService {
     private static final Object LOCK = new Object();
     private static final DetectiveUiRepository REPOSITORY = new DetectiveUiRepository(ModDetectivePaths.incidents());
     private static final IncidentQueryEngine QUERY_ENGINE = new IncidentQueryEngine();
+    private static final CaseEvolutionEngine CASE_EVOLUTION_ENGINE = new CaseEvolutionEngine();
     private static final ExecutorService WORKER = Executors.newSingleThreadExecutor(task -> {
         Thread thread = new Thread(task, "Detective-UiData");
         thread.setDaemon(true);
@@ -97,6 +103,49 @@ public final class DetectiveUiService {
         synchronized (LOCK) {
             return cachedCases == null ? refreshCases() : cachedCases;
         }
+    }
+
+    /**
+     * Correlates one prepared Case with retained incidents and the existing snapshot comparison.
+     * Disk loading and analysis are both delegated to Detective's background workers.
+     */
+    public static CompletableFuture<CaseEvolution> caseEvolution(String caseId) {
+        String requestedCaseId = java.util.Objects.requireNonNull(caseId, "caseId").strip();
+        if (requestedCaseId.isEmpty()) {
+            return CompletableFuture.failedFuture(
+                    new IllegalArgumentException("caseId must not be blank"));
+        }
+        CompletableFuture<IncidentSearchHistory> history;
+        synchronized (LOCK) {
+            if (cachedSearchHistory == null) {
+                refreshIndex();
+            }
+            history = cachedSearchHistory;
+        }
+        return history.thenCombineAsync(
+                DetectiveSupportService.preparedCaseHistory(),
+                (incidents, cases) -> {
+                    CaseFile selected = cases.cases().stream()
+                            .filter(value -> value.caseId().equals(requestedCaseId))
+                            .findFirst()
+                            .orElseThrow(() -> new CompletionException(
+                                    new IllegalArgumentException("Unknown Case: " + requestedCaseId)));
+                    int unreadable = Math.max(
+                            incidents.incidentIndex().unreadableFiles(),
+                            cases.unreadableIncidents());
+                    RetainedHistoryCoverage coverage = RetainedHistoryCoverage.bounded(
+                            true,
+                            cases.incidentsIgnoredByBound() > 0
+                                    || incidents.records().size()
+                                    >= DetectiveSupportService.settings().incidentHistoryLimit(),
+                            unreadable);
+                    return CASE_EVOLUTION_ENGINE.analyze(
+                            selected,
+                            incidents.records(),
+                            coverage,
+                            ModpackChangeHistory.latest(ModSnapshotService.latestDiff()));
+                },
+                WORKER);
     }
 
     public static void invalidateCases() {
