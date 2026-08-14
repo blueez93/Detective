@@ -11,11 +11,11 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
-import net.minecraft.util.Mth;
 
 public final class DetectiveHomeScreen extends Screen {
     private final Screen parent;
     private final boolean refreshOnInit;
+    private final DetectiveScrollState scrollState = new DetectiveScrollState();
     private IncidentIndexViewModel index;
     private CaseIndexViewModel cases;
     private boolean loading = true;
@@ -24,7 +24,6 @@ public final class DetectiveHomeScreen extends Screen {
     private boolean casesLoadFailed;
     private Button lastIncidentButton;
     private Button exportButton;
-    private double scrollOffset;
     private int contentHeight;
 
     public DetectiveHomeScreen(Screen parent) {
@@ -62,6 +61,7 @@ public final class DetectiveHomeScreen extends Screen {
 
     @Override
     protected void init() {
+        scrollState.cancelDrag();
         int contentWidth = Math.min(440, this.width - 24);
         int left = (this.width - contentWidth) / 2;
         int gap = 4;
@@ -161,7 +161,11 @@ public final class DetectiveHomeScreen extends Screen {
         int left = (this.width - contentWidth) / 2;
         int navigationY = this.height - DetectiveUiRenderer.FOOTER_HEIGHT - 48;
         int statusY = DetectiveUiRenderer.HEADER_HEIGHT + 8;
-        int contentY = statusY - (int) scrollOffset;
+        int viewportBottom = navigationY - 3;
+        int viewportHeight = Math.max(1, viewportBottom - statusY);
+        int scrollbarX = Math.min(this.width - 6, left + contentWidth + 4);
+        scrollState.updateLayout(contentHeight, statusY, viewportHeight, scrollbarX, 4);
+        int contentY = statusY - scrollState.roundedOffset();
         int statusHeight = 88;
         int summaryY = contentY + statusHeight + 8;
         int summaryHeight = index != null && index.unreadableFiles() > 0 ? 162 : 147;
@@ -181,7 +185,8 @@ public final class DetectiveHomeScreen extends Screen {
         }
         graphics.disableScissor();
         contentHeight = statusHeight + 8 + summaryHeight;
-        scrollOffset = Mth.clamp(scrollOffset, 0.0, maximumScroll());
+        scrollState.updateLayout(contentHeight, statusY, viewportHeight, scrollbarX, 4);
+        DetectiveUiRenderer.scrollbar(graphics, scrollState);
         DetectiveUiRenderer.widgets(this, graphics, mouseX, mouseY, partialTick);
     }
 
@@ -260,15 +265,40 @@ public final class DetectiveHomeScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
-        scrollOffset = Mth.clamp(scrollOffset - scrollY * 24.0, 0.0, maximumScroll());
-        return true;
+        if (scrollState.isWithinViewport(mouseY) && scrollState.scrollWheel(scrollY)) {
+            return true;
+        }
+        return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
     }
 
-    private double maximumScroll() {
-        int statusY = DetectiveUiRenderer.HEADER_HEIGHT + 8;
-        int navigationY = this.height - DetectiveUiRenderer.FOOTER_HEIGHT - 48;
-        int viewportHeight = Math.max(1, navigationY - 3 - statusY);
-        return Math.max(0, contentHeight - viewportHeight);
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (scrollState.mouseClicked(mouseX, mouseY, button)) {
+            return true;
+        }
+        return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    @Override
+    public boolean mouseDragged(
+            double mouseX,
+            double mouseY,
+            int button,
+            double dragX,
+            double dragY
+    ) {
+        if (scrollState.mouseDragged(mouseY, button)) {
+            return true;
+        }
+        return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+    }
+
+    @Override
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (scrollState.mouseReleased(button)) {
+            return true;
+        }
+        return super.mouseReleased(mouseX, mouseY, button);
     }
 
     @Override

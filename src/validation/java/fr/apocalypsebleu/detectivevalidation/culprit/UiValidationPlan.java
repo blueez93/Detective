@@ -62,6 +62,16 @@ public final class UiValidationPlan {
     private static final String CASE_FILE_MIXED_ROUTE = "case-file-mixed";
     private static final String CASE_FILES_LEGACY_ROUTE = "case-files-legacy";
     private static final String CASE_FILES_HOME_ROUTE = "case-files-home";
+    private static final String CASE_EVOLUTION_UPDATE_BEFORE_ROUTE = "case-evolution-update-before";
+    private static final String CASE_EVOLUTION_ADDED_BEFORE_ROUTE = "case-evolution-added-before";
+    private static final String CASE_EVOLUTION_REMOVED_BEFORE_ROUTE = "case-evolution-removed-before";
+    private static final String CASE_EVOLUTION_CHANGE_AFTER_ROUTE = "case-evolution-change-after";
+    private static final String CASE_EVOLUTION_MULTIPLE_ROUTE = "case-evolution-multiple";
+    private static final String CASE_EVOLUTION_NONE_ROUTE = "case-evolution-none";
+    private static final String CASE_EVOLUTION_LIMITED_BEFORE_ROUTE = "case-evolution-limited-before";
+    private static final String CASE_EVOLUTION_INSUFFICIENT_ROUTE = "case-evolution-insufficient";
+    private static final String CASE_EVOLUTION_SAME_LAUNCH_ROUTE = "case-evolution-same-launch";
+    private static final String CASE_EVOLUTION_LONG_MOD_NAME_ROUTE = "case-evolution-long-mod-name";
     private static final String INCIDENT_SEARCH_ROUTE = "incident-search";
     private static final String INCIDENT_SEARCH_EMPTY_ROUTE = "incident-search-empty";
     private static final String INCIDENT_FILTERS_ROUTE = "incident-filters";
@@ -232,7 +242,21 @@ public final class UiValidationPlan {
                 || CASE_FILE_DETAIL_ROUTE.equals(route)
                 || CASE_FILE_MIXED_ROUTE.equals(route)
                 || CASE_FILES_LEGACY_ROUTE.equals(route)
-                || CASE_FILES_HOME_ROUTE.equals(route);
+                || CASE_FILES_HOME_ROUTE.equals(route)
+                || isCaseEvolutionRoute(route);
+    }
+
+    private static boolean isCaseEvolutionRoute(String route) {
+        return CASE_EVOLUTION_UPDATE_BEFORE_ROUTE.equals(route)
+                || CASE_EVOLUTION_ADDED_BEFORE_ROUTE.equals(route)
+                || CASE_EVOLUTION_REMOVED_BEFORE_ROUTE.equals(route)
+                || CASE_EVOLUTION_CHANGE_AFTER_ROUTE.equals(route)
+                || CASE_EVOLUTION_MULTIPLE_ROUTE.equals(route)
+                || CASE_EVOLUTION_NONE_ROUTE.equals(route)
+                || CASE_EVOLUTION_LIMITED_BEFORE_ROUTE.equals(route)
+                || CASE_EVOLUTION_INSUFFICIENT_ROUTE.equals(route)
+                || CASE_EVOLUTION_SAME_LAUNCH_ROUTE.equals(route)
+                || CASE_EVOLUTION_LONG_MOD_NAME_ROUTE.equals(route);
     }
 
     private static void beginPublicDemo() {
@@ -345,12 +369,17 @@ public final class UiValidationPlan {
                 }
             }, 500L);
             if (INCIDENT_COMPARISON_HIGH_ROUTE.equals(publicDemoRoute)) {
-                schedule(() -> scrollCurrentScreen(-3.0), 1_500L);
+                schedule(UiValidationPlan::dragCurrentScreenScrollbar, 1_100L);
+                schedule(() -> scrollCurrentScreen(-3.0), 1_600L);
                 schedule(() -> screenshot(screenshotName), 2_500L);
                 schedule(() -> scrollCurrentScreen(-6.0), 2_800L);
                 schedule(() -> screenshot("detective-v090-incident-comparison-high-b.png"), 3_800L);
                 schedule(UiValidationPlan::complete, 4_800L);
                 return;
+            }
+            if (INCIDENT_COMPARISON_INSUFFICIENT_ROUTE.equals(publicDemoRoute)) {
+                schedule(UiValidationPlan::dragCurrentScreenScrollbar, 1_100L);
+                schedule(() -> scrollCurrentScreen(-1.0), 1_600L);
             }
             if (INCIDENT_COMPARISON_LEGACY_ROUTE.equals(publicDemoRoute)) {
                 schedule(() -> scrollCurrentScreen(-8.0), 1_500L);
@@ -372,7 +401,7 @@ public final class UiValidationPlan {
                 RUNNING.set(false);
                 return;
             }
-            String screenshotName = "detective-v080-" + publicDemoRoute + ".png";
+            String screenshotName = "detective-v090-" + publicDemoRoute + ".png";
             schedule(() -> {
                 Screen parent = Minecraft.getInstance().screen;
                 switch (publicDemoRoute) {
@@ -395,12 +424,52 @@ public final class UiValidationPlan {
                                     IncidentIndexViewModel.empty(
                                             System.currentTimeMillis(), System.currentTimeMillis() - 60_000L),
                                     CaseFileValidationFixtures.oneHighConsistencyCase()));
+                    case CASE_EVOLUTION_UPDATE_BEFORE_ROUTE -> showCaseEvolution(parent,
+                            CaseEvolutionValidationFixtures.updateBefore());
+                    case CASE_EVOLUTION_ADDED_BEFORE_ROUTE -> showCaseEvolution(parent,
+                            CaseEvolutionValidationFixtures.addedBefore());
+                    case CASE_EVOLUTION_REMOVED_BEFORE_ROUTE -> showCaseEvolution(parent,
+                            CaseEvolutionValidationFixtures.removedBefore());
+                    case CASE_EVOLUTION_CHANGE_AFTER_ROUTE -> showCaseEvolution(parent,
+                            CaseEvolutionValidationFixtures.changeAfter());
+                    case CASE_EVOLUTION_MULTIPLE_ROUTE -> showCaseEvolution(parent,
+                            CaseEvolutionValidationFixtures.multiple());
+                    case CASE_EVOLUTION_NONE_ROUTE -> showCaseEvolution(parent,
+                            CaseEvolutionValidationFixtures.none());
+                    case CASE_EVOLUTION_LIMITED_BEFORE_ROUTE -> showCaseEvolution(parent,
+                            CaseEvolutionValidationFixtures.limitedBefore());
+                    case CASE_EVOLUTION_INSUFFICIENT_ROUTE -> showCaseEvolution(parent,
+                            CaseEvolutionValidationFixtures.insufficient());
+                    case CASE_EVOLUTION_SAME_LAUNCH_ROUTE -> showCaseEvolution(parent,
+                            CaseEvolutionValidationFixtures.sameLaunch());
+                    case CASE_EVOLUTION_LONG_MOD_NAME_ROUTE -> showCaseEvolution(parent,
+                            CaseEvolutionValidationFixtures.longModName());
                     default -> throw new IllegalStateException("Unknown Case Files route: " + publicDemoRoute);
                 }
             }, 500L);
+            if (isCaseEvolutionRoute(publicDemoRoute)) {
+                schedule(UiValidationPlan::dragCurrentScreenScrollbar, 1_100L);
+                schedule(() -> scrollCurrentScreen(-7.0), 1_600L);
+                if (CASE_EVOLUTION_SAME_LAUNCH_ROUTE.equals(publicDemoRoute)) {
+                    schedule(() -> scrollCurrentScreen(-7.0), 2_000L);
+                }
+            } else if (CASE_FILE_DETAIL_ROUTE.equals(publicDemoRoute)) {
+                schedule(UiValidationPlan::dragCurrentScreenScrollbar, 1_100L);
+                schedule(() -> scrollCurrentScreen(-1.0), 1_600L);
+            }
             schedule(() -> screenshot(screenshotName), 2_500L);
             schedule(UiValidationPlan::complete, 3_500L);
         });
+    }
+
+    private static void showCaseEvolution(
+            Screen parent,
+            fr.apocalypsebleu.moddetective.client.ui.model.CaseEvolutionViewModel evolution
+    ) {
+        Minecraft.getInstance().setScreen(new CaseFileDetailScreen(
+                parent,
+                CaseFileValidationFixtures.caseDetailWithSeveralRelatedIncidents(),
+                evolution));
     }
 
     private static void scheduleScreens(IncidentIndexViewModel index, boolean worldAvailable) {
@@ -549,6 +618,35 @@ public final class UiValidationPlan {
         if (screen != null) {
             screen.mouseScrolled(screen.width / 2.0, screen.height / 2.0, 0.0, amount);
         }
+    }
+
+    private static void dragCurrentScreenScrollbar() {
+        Screen screen = Minecraft.getInstance().screen;
+        int contentWidth;
+        if (screen instanceof IncidentComparisonScreen) {
+            contentWidth = Math.min(600, screen.width - 20);
+        } else if (screen instanceof CaseFileDetailScreen) {
+            contentWidth = Math.min(560, screen.width - 24);
+        } else {
+            DetectiveTestCulprit.LOGGER.error(
+                    "[Detective Validation] UI_SCROLLBAR_DRAG unsupported screen: {}",
+                    screen == null ? "null" : screen.getClass().getSimpleName());
+            return;
+        }
+
+        int left = (screen.width - contentWidth) / 2;
+        int scrollbarX = Math.min(screen.width - 6, left + contentWidth + 4) + 1;
+        int viewportTop = 46;
+        int viewportBottom = screen.height - 48;
+        int grabY = viewportTop + 6;
+        int targetY = viewportTop + (viewportBottom - viewportTop) * 2 / 3;
+        boolean clicked = screen.mouseClicked(scrollbarX, grabY, 0);
+        boolean dragged = screen.mouseDragged(
+                scrollbarX, targetY, 0, 0.0, targetY - grabY);
+        boolean released = screen.mouseReleased(scrollbarX, targetY, 0);
+        DetectiveTestCulprit.LOGGER.info(
+                "[Detective Validation] UI_SCROLLBAR_DRAG screen={} clicked={} dragged={} released={}",
+                screen.getClass().getSimpleName(), clicked, dragged, released);
     }
 
     private static void scrollDetail(double amount) {

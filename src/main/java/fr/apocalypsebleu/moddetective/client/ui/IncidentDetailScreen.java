@@ -13,7 +13,6 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
-import net.minecraft.util.Mth;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -24,10 +23,10 @@ public final class IncidentDetailScreen extends Screen {
     private final Screen parent;
     private final IncidentSummaryViewModel summary;
     private final IncidentDetailViewModel preloadedDetail;
+    private final DetectiveScrollState scrollState = new DetectiveScrollState();
     private IncidentDetailViewModel detail;
     private boolean loading = true;
     private boolean loadFailed;
-    private double scrollOffset;
     private int contentHeight;
     private Component pendingTooltip;
     private boolean technicalActionVisible;
@@ -59,6 +58,7 @@ public final class IncidentDetailScreen extends Screen {
 
     @Override
     protected void init() {
+        scrollState.cancelDrag();
         int actionWidth = Math.min(400, this.width - 16);
         int backWidth = 90;
         int gap = 4;
@@ -84,7 +84,7 @@ public final class IncidentDetailScreen extends Screen {
             loading = false;
             loadFailed = error != null;
             detail = error == null ? loaded : null;
-            scrollOffset = 0.0;
+            scrollState.scrollTo(0.0);
         }));
     }
 
@@ -110,9 +110,12 @@ public final class IncidentDetailScreen extends Screen {
 
     private void renderContent(GuiGraphics graphics, int mouseX, int mouseY) {
         int viewportBottom = this.height - DetectiveUiRenderer.FOOTER_HEIGHT - 2;
+        int viewportHeight = Math.max(1, viewportBottom - CONTENT_TOP);
         int width = Math.min(540, this.width - 24);
         int left = (this.width - width) / 2;
-        int y = CONTENT_TOP - (int) scrollOffset;
+        int scrollbarX = Math.min(this.width - 6, left + width + 4);
+        scrollState.updateLayout(contentHeight, CONTENT_TOP, viewportHeight, scrollbarX, 4);
+        int y = CONTENT_TOP - scrollState.roundedOffset();
         int startY = y;
         pendingTooltip = null;
         technicalActionVisible = false;
@@ -129,11 +132,12 @@ public final class IncidentDetailScreen extends Screen {
         graphics.disableScissor();
 
         contentHeight = y - startY;
-        scrollOffset = Mth.clamp(scrollOffset, 0.0, maximumScroll());
+        scrollState.updateLayout(contentHeight, CONTENT_TOP, viewportHeight, scrollbarX, 4);
         if (scrollToTechnicalPending) {
-            scrollOffset = Mth.clamp(technicalSectionOffset, 0.0, maximumScroll());
+            scrollState.scrollTo(technicalSectionOffset);
             scrollToTechnicalPending = false;
         }
+        DetectiveUiRenderer.scrollbar(graphics, scrollState);
         if (pendingTooltip != null) {
             graphics.renderTooltip(this.font, this.font.split(pendingTooltip, Math.min(300, this.width - 32)),
                     mouseX, mouseY);
@@ -439,9 +443,11 @@ public final class IncidentDetailScreen extends Screen {
             graphics.drawString(this.font, Component.translatable("detective.ui.incident.technical.extra",
                             suspect.repeatedLeafOwnership(), suspect.stackDiversity()),
                     x + 10, rowY + 49, DetectiveUiRenderer.MUTED, false);
-            if (inside(mouseX, mouseY, x + 8, leafY - 2, width - 16, 12)) {
+            if (scrollState.isWithinViewport(mouseY)
+                    && inside(mouseX, mouseY, x + 8, leafY - 2, width - 16, 12)) {
                 pendingTooltip = Component.translatable("detective.ui.incident.technical.leaf.tooltip");
-            } else if (inside(mouseX, mouseY, x + 8, presenceY - 2, width - 16, 12)) {
+            } else if (scrollState.isWithinViewport(mouseY)
+                    && inside(mouseX, mouseY, x + 8, presenceY - 2, width - 16, 12)) {
                 pendingTooltip = Component.translatable("detective.ui.incident.technical.presence.tooltip");
             }
         }
@@ -454,10 +460,13 @@ public final class IncidentDetailScreen extends Screen {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (button == 0 && technicalActionVisible
+        if (scrollState.mouseClicked(mouseX, mouseY, button)) {
+            return true;
+        }
+        if (button == 0 && scrollState.isWithinViewport(mouseY) && technicalActionVisible
                 && mouseX >= technicalActionX && mouseX < technicalActionX + technicalActionWidth
                 && mouseY >= technicalActionY - 2 && mouseY < technicalActionY + this.font.lineHeight + 3) {
-            scrollOffset = maximumScroll();
+            scrollState.scrollToBottom();
             return true;
         }
         return super.mouseClicked(mouseX, mouseY, button);
@@ -473,13 +482,32 @@ public final class IncidentDetailScreen extends Screen {
         if (detail == null) {
             return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
         }
-        scrollOffset = Mth.clamp(scrollOffset - scrollY * 24.0, 0.0, maximumScroll());
-        return true;
+        if (scrollState.isWithinViewport(mouseY) && scrollState.scrollWheel(scrollY)) {
+            return true;
+        }
+        return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
     }
 
-    private double maximumScroll() {
-        int viewportHeight = this.height - DetectiveUiRenderer.FOOTER_HEIGHT - CONTENT_TOP - 2;
-        return Math.max(0, contentHeight - viewportHeight);
+    @Override
+    public boolean mouseDragged(
+            double mouseX,
+            double mouseY,
+            int button,
+            double dragX,
+            double dragY
+    ) {
+        if (scrollState.mouseDragged(mouseY, button)) {
+            return true;
+        }
+        return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+    }
+
+    @Override
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (scrollState.mouseReleased(button)) {
+            return true;
+        }
+        return super.mouseReleased(mouseX, mouseY, button);
     }
 
     @Override

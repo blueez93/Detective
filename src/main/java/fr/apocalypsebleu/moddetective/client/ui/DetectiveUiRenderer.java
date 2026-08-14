@@ -36,6 +36,19 @@ final class DetectiveUiRenderer {
         graphics.renderOutline(x, y, width, height, PANEL_BORDER);
     }
 
+    static void scrollbar(GuiGraphics graphics, DetectiveScrollState scrollState) {
+        DetectiveScrollState.ScrollbarGeometry geometry = scrollState.geometry();
+        if (!geometry.visible()) {
+            return;
+        }
+        int trackCenter = geometry.trackX() + geometry.trackWidth() / 2;
+        graphics.fill(trackCenter - 1, geometry.trackTop(), trackCenter + 1,
+                geometry.trackTop() + geometry.trackHeight(), 0xAA182431);
+        graphics.fill(geometry.trackX(), geometry.thumbTop(),
+                geometry.trackX() + geometry.trackWidth(),
+                geometry.thumbTop() + geometry.thumbHeight(), 0xFF537FA3);
+    }
+
     static void widgets(Screen screen, GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         for (var renderable : screen.renderables) {
             renderable.render(graphics, mouseX, mouseY, partialTick);

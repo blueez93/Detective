@@ -12,7 +12,6 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
-import net.minecraft.util.Mth;
 
 import java.util.List;
 import java.util.LinkedHashMap;
@@ -28,10 +27,10 @@ public final class IncidentComparisonScreen extends Screen {
     private final IncidentSummaryViewModel firstSummary;
     private final IncidentSummaryViewModel secondSummary;
     private final Map<String, String> ownerDisplayNames;
+    private final DetectiveScrollState scrollState = new DetectiveScrollState();
     private IncidentComparisonViewModel comparison;
     private boolean loading;
     private boolean loadFailed;
-    private double scrollOffset;
     private int contentHeight;
 
     public IncidentComparisonScreen(
@@ -76,6 +75,7 @@ public final class IncidentComparisonScreen extends Screen {
 
     @Override
     protected void init() {
+        scrollState.cancelDrag();
         int buttonWidth = Math.min(110, Math.max(82, (this.width - 32) / 4));
         int gap = 4;
         int total = buttonWidth * 3 + gap * 2;
@@ -132,9 +132,13 @@ public final class IncidentComparisonScreen extends Screen {
 
     private void renderComparison(GuiGraphics graphics) {
         int viewportBottom = this.height - DetectiveUiRenderer.FOOTER_HEIGHT - 2;
+        int viewportHeight = Math.max(1, viewportBottom - CONTENT_TOP);
         int width = Math.min(600, this.width - 20);
         int left = (this.width - width) / 2;
-        int y = CONTENT_TOP - (int) scrollOffset;
+        int scrollbarX = Math.min(this.width - 6, left + width + 4);
+        scrollState.updateLayout(contentHeight, CONTENT_TOP, viewportHeight, scrollbarX, 4);
+        int y = CONTENT_TOP - scrollState.roundedOffset();
+        int startY = y;
         graphics.enableScissor(0, CONTENT_TOP, this.width, viewportBottom);
         y = renderCaution(graphics, left, y, width) + 6;
         y = renderSimilarity(graphics, left, y, width) + 6;
@@ -147,8 +151,9 @@ public final class IncidentComparisonScreen extends Screen {
         y = renderEvidenceGroup(graphics, left, y, width,
                 "detective.ui.comparison.evidence.only_b", comparison.evidence().onlySecond());
         graphics.disableScissor();
-        contentHeight = y - (CONTENT_TOP - (int) scrollOffset);
-        scrollOffset = Mth.clamp(scrollOffset, 0.0, maximumScroll());
+        contentHeight = y - startY;
+        scrollState.updateLayout(contentHeight, CONTENT_TOP, viewportHeight, scrollbarX, 4);
+        DetectiveUiRenderer.scrollbar(graphics, scrollState);
     }
 
     private int renderEvidenceAvailability(GuiGraphics graphics, int x, int y, int width) {
@@ -355,13 +360,40 @@ public final class IncidentComparisonScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
-        scrollOffset = Mth.clamp(scrollOffset - scrollY * 24.0, 0.0, maximumScroll());
-        return true;
+        if (scrollState.isWithinViewport(mouseY) && scrollState.scrollWheel(scrollY)) {
+            return true;
+        }
+        return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
     }
 
-    private double maximumScroll() {
-        int viewportHeight = this.height - DetectiveUiRenderer.FOOTER_HEIGHT - CONTENT_TOP - 2;
-        return Math.max(0, contentHeight - viewportHeight);
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (scrollState.mouseClicked(mouseX, mouseY, button)) {
+            return true;
+        }
+        return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    @Override
+    public boolean mouseDragged(
+            double mouseX,
+            double mouseY,
+            int button,
+            double dragX,
+            double dragY
+    ) {
+        if (scrollState.mouseDragged(mouseY, button)) {
+            return true;
+        }
+        return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+    }
+
+    @Override
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (scrollState.mouseReleased(button)) {
+            return true;
+        }
+        return super.mouseReleased(mouseX, mouseY, button);
     }
 
     @Override

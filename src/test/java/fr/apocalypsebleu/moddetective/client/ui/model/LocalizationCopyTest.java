@@ -53,6 +53,18 @@ class LocalizationCopyTest {
                 english.get("detective.ui.comparison.caution"));
         assertEquals("Technical signature #%s",
                 english.get("detective.ui.comparison.evidence.signature"));
+        assertEquals("WHAT CHANGED?",
+                english.get("detective.ui.case.evolution.title"));
+        assertEquals("First recorded occurrence: %s",
+                english.get("detective.ui.case.evolution.first_recorded"));
+        assertEquals("Temporal proximity does not establish causation.",
+                english.get("detective.ui.case.evolution.caution"));
+        assertEquals("No nearby modpack change recorded.",
+                english.get("detective.ui.case.evolution.none"));
+        assertEquals("Recorded in the same launch interval as the first recorded occurrence.",
+                english.get("detective.ui.case.evolution.same_launch"));
+        assertEquals("Unavailable",
+                english.get("detective.ui.case.evolution.unavailable"));
     }
 
     @Test
@@ -74,6 +86,8 @@ class LocalizationCopyTest {
         assertTrue(french.contains("suspect principal"));
         assertTrue(language("fr_fr").get("detective.ui.comparison.caution")
                 .contains("ne prouve pas"));
+        assertEquals("La proximité temporelle n'établit pas de causalité.",
+                language("fr_fr").get("detective.ui.case.evolution.caution"));
     }
 
     private static Map<String, String> language(String code) throws IOException {

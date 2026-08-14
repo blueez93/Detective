@@ -3,6 +3,7 @@ package fr.apocalypsebleu.moddetective.client.ui.data;
 import fr.apocalypsebleu.moddetective.ModDetective;
 import fr.apocalypsebleu.moddetective.client.support.DetectiveSupportService;
 import fr.apocalypsebleu.moddetective.client.ui.model.CaseIndexViewModel;
+import fr.apocalypsebleu.moddetective.client.ui.model.CaseEvolutionViewModel;
 import fr.apocalypsebleu.moddetective.client.ui.model.IncidentDetailViewModel;
 import fr.apocalypsebleu.moddetective.client.ui.model.IncidentIndexViewModel;
 import fr.apocalypsebleu.moddetective.client.ui.model.ModpackChangesViewModel;
@@ -146,6 +147,11 @@ public final class DetectiveUiService {
                             ModpackChangeHistory.from(ModSnapshotService.latestLaunchHistory()));
                 },
                 WORKER);
+    }
+
+    /** Keeps the bounded UI projection on the same background worker as Case analysis. */
+    public static CompletableFuture<CaseEvolutionViewModel> caseEvolutionViewModel(String caseId) {
+        return caseEvolution(caseId).thenApplyAsync(CaseEvolutionUiAdapter::from, WORKER);
     }
 
     public static void invalidateCases() {
