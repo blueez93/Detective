@@ -22,6 +22,10 @@ public final class ModDetectivePaths {
         return root().resolve("incidents");
     }
 
+    public static Path launchHistory() {
+        return snapshots().resolve("launch-history.json");
+    }
+
     public static Path reports() {
         return root().resolve("reports");
     }

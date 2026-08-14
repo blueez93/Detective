@@ -2,8 +2,7 @@ package fr.apocalypsebleu.moddetective.client.ui.data.evolution;
 
 import fr.apocalypsebleu.moddetective.client.ui.data.query.IncidentSearchRecord;
 import fr.apocalypsebleu.moddetective.core.casefile.CaseFile;
-import fr.apocalypsebleu.moddetective.snapshot.ModSnapshot;
-import fr.apocalypsebleu.moddetective.snapshot.ModSnapshotDiff;
+import fr.apocalypsebleu.moddetective.snapshot.ModpackLaunchRecord;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -17,7 +16,7 @@ import java.util.Optional;
 import java.util.OptionalLong;
 
 /**
- * Deterministic temporal correlation over explicit Case members and existing snapshot diffs.
+ * Deterministic temporal correlation over explicit Case members and recorded launch boundaries.
  * Work is linear in retained members plus changes, apart from stable sorting. Nearby changes from
  * the same recorded launch sort first, followed by absolute time offset, recorded timestamp,
  * change type, mod id, display name, and versions. None of those positions represents causal
@@ -102,8 +101,8 @@ public final class CaseEvolutionEngine {
     ) {
         long firstAt = first.detectedAtEpochMs();
         long broaderWindowMs = configuration.broaderNearbyWindow().toMillis();
-        List<RecordedChange> flattened = flatten(history.diffs());
-        long launchAt = latestLaunchAtOrBefore(history.diffs(), firstAt);
+        List<RecordedChange> flattened = flatten(history.launches());
+        long launchAt = latestLaunchAtOrBefore(history.launches(), firstAt);
         List<CaseEvolution.NearbyModpackChange> result = new ArrayList<>();
         for (RecordedChange change : flattened) {
             long offset = saturatedSubtract(change.recordedAtEpochMs(), firstAt);
@@ -232,11 +231,14 @@ public final class CaseEvolutionEngine {
         } else if (changes.availability() == ModpackChangeHistory.Availability.PARTIAL) {
             limitations.add(CaseEvolution.CoverageLimitation.PARTIAL_CHANGE_HISTORY);
         }
-        if (changes.unavailableSnapshotFiles() > 0) {
-            limitations.add(CaseEvolution.CoverageLimitation.UNAVAILABLE_SNAPSHOT_FILES);
+        if (changes.unavailableSourceFiles() > 0) {
+            limitations.add(CaseEvolution.CoverageLimitation.UNAVAILABLE_CHANGE_HISTORY_SOURCES);
         }
-        if (changes.omittedEarlierSnapshots() > 0) {
-            limitations.add(CaseEvolution.CoverageLimitation.OMITTED_EARLIER_SNAPSHOTS);
+        if (changes.omittedEarlierLaunches() > 0L) {
+            limitations.add(CaseEvolution.CoverageLimitation.OMITTED_EARLIER_LAUNCH_RECORDS);
+        }
+        if (changes.earlierLaunchHistoryUnavailable()) {
+            limitations.add(CaseEvolution.CoverageLimitation.EARLIER_LAUNCH_HISTORY_UNAVAILABLE);
         }
 
         CaseEvolution.CoverageStatus status;
@@ -245,7 +247,8 @@ public final class CaseEvolutionEngine {
                 || changes.availability() == ModpackChangeHistory.Availability.UNAVAILABLE) {
             status = CaseEvolution.CoverageStatus.INSUFFICIENT;
         } else if (retained.ageBoundedBefore() || retained.countBoundedBefore()
-                || changes.omittedEarlierSnapshots() > 0) {
+                || changes.omittedEarlierLaunches() > 0L
+                || changes.earlierLaunchHistoryUnavailable()) {
             status = CaseEvolution.CoverageStatus.LIMITED_BEFORE;
         } else if (!limitations.isEmpty()) {
             status = CaseEvolution.CoverageStatus.UNKNOWN;
@@ -294,25 +297,17 @@ public final class CaseEvolutionEngine {
         return CaseEvolution.ProximityBand.WITHIN_BROADER_NEARBY_WINDOW;
     }
 
-    private static List<RecordedChange> flatten(List<ModSnapshotDiff> diffs) {
+    private static List<RecordedChange> flatten(List<ModpackLaunchRecord> launches) {
         List<RecordedChange> result = new ArrayList<>();
-        for (ModSnapshotDiff diff : diffs) {
-            long timestamp = diff.current().capturedAtEpochMs();
-            for (ModSnapshot.LoadedMod mod : diff.added()) {
+        for (ModpackLaunchRecord launch : launches) {
+            for (ModpackLaunchRecord.ModChange change : launch.changes()) {
                 result.add(new RecordedChange(
-                        CaseEvolution.ChangeType.ADDED, mod.id(), displayName(mod.name(), mod.id()),
-                        Optional.empty(), Optional.of(mod.version()), timestamp));
-            }
-            for (ModSnapshotDiff.VersionChange change : diff.updated()) {
-                result.add(new RecordedChange(
-                        CaseEvolution.ChangeType.UPDATED, change.id(),
-                        displayName(change.name(), change.id()),
-                        Optional.of(change.oldVersion()), Optional.of(change.newVersion()), timestamp));
-            }
-            for (ModSnapshot.LoadedMod mod : diff.removed()) {
-                result.add(new RecordedChange(
-                        CaseEvolution.ChangeType.REMOVED, mod.id(), displayName(mod.name(), mod.id()),
-                        Optional.of(mod.version()), Optional.empty(), timestamp));
+                        CaseEvolution.ChangeType.valueOf(change.type().name()),
+                        change.modId(),
+                        displayName(change.modDisplayName(), change.modId()),
+                        change.previousVersion(),
+                        change.newVersion(),
+                        launch.launchAtEpochMs()));
             }
         }
         return result;
@@ -334,12 +329,14 @@ public final class CaseEvolutionEngine {
         return result;
     }
 
-    private static long latestLaunchAtOrBefore(List<ModSnapshotDiff> diffs, long timestamp) {
+    private static long latestLaunchAtOrBefore(
+            List<ModpackLaunchRecord> launches,
+            long timestamp
+    ) {
         long result = Long.MIN_VALUE;
-        for (ModSnapshotDiff diff : diffs) {
-            long capturedAt = diff.current().capturedAtEpochMs();
-            if (capturedAt <= timestamp) {
-                result = Math.max(result, capturedAt);
+        for (ModpackLaunchRecord launch : launches) {
+            if (launch.launchAtEpochMs() <= timestamp) {
+                result = Math.max(result, launch.launchAtEpochMs());
             }
         }
         return result;

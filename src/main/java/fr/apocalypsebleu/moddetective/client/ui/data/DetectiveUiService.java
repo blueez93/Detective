@@ -143,7 +143,7 @@ public final class DetectiveUiService {
                             selected,
                             incidents.records(),
                             coverage,
-                            ModpackChangeHistory.latest(ModSnapshotService.latestDiff()));
+                            ModpackChangeHistory.from(ModSnapshotService.latestLaunchHistory()));
                 },
                 WORKER);
     }

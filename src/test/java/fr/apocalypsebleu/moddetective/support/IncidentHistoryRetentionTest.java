@@ -58,12 +58,14 @@ class IncidentHistoryRetentionTest {
         Files.writeString(Files.createDirectories(incidents).resolve("notes.txt"), "keep");
         Files.writeString(Files.createDirectories(detective.resolve("snapshots"))
                 .resolve("last-session.json"), "keep");
+        Files.writeString(detective.resolve("snapshots/launch-history.json"), "keep");
 
         IncidentHistoryRetention.Result result = IncidentHistoryRetention.clear(incidents);
 
         assertEquals(1, result.deleted());
         assertTrue(Files.exists(incidents.resolve("notes.txt")));
         assertTrue(Files.exists(detective.resolve("snapshots/last-session.json")));
+        assertTrue(Files.exists(detective.resolve("snapshots/launch-history.json")));
     }
 
     private static void write(Path root, String name, long detectedAt) throws IOException {

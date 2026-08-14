@@ -25,29 +25,85 @@ import java.util.stream.Collectors;
 public final class ModSnapshotService {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final AtomicReference<ModSnapshotDiff> LATEST_DIFF = new AtomicReference<>();
+    private static final AtomicReference<ModpackLaunchHistoryState> LATEST_LAUNCH_HISTORY =
+            new AtomicReference<>(ModpackLaunchHistoryState.unavailable());
 
     private ModSnapshotService() {}
 
     public static ModSnapshotDiff captureAndPersist() {
         ModSnapshot current = capture();
         ModSnapshot previous = null;
+        boolean currentSnapshotPersisted = false;
 
         try {
             ModDetectivePaths.ensureDirectories();
             Path target = ModDetectivePaths.snapshots().resolve("last-session.json");
             previous = readPrevious(target);
             AtomicFiles.writeUtf8(target, GSON.toJson(current));
+            currentSnapshotPersisted = true;
         } catch (IOException | RuntimeException e) {
             ModDetective.LOGGER.error("[Detective] Unable to persist the mod snapshot", e);
         }
 
         ModSnapshotDiff diff = ModSnapshotDiff.between(previous, current);
         LATEST_DIFF.set(diff);
+        try {
+            LATEST_LAUNCH_HISTORY.set(currentSnapshotPersisted
+                    ? persistLaunchHistory(
+                            ModDetectivePaths.launchHistory(),
+                            diff,
+                            ModpackLaunchHistory.DEFAULT_MAXIMUM_RECORDS)
+                    : currentLaunchInMemory(
+                            ModDetectivePaths.launchHistory(),
+                            diff,
+                            ModpackLaunchHistory.DEFAULT_MAXIMUM_RECORDS));
+        } catch (IOException | RuntimeException e) {
+            ModpackLaunchRecord currentRecord = ModpackLaunchRecord.from(diff);
+            LATEST_LAUNCH_HISTORY.set(new ModpackLaunchHistoryState(
+                    new ModpackLaunchHistory(List.of(currentRecord), 0L, true),
+                    1,
+                    false));
+            ModDetective.LOGGER.warn(
+                    "[Detective] Modpack launch history is unavailable; the current launch remains in memory only",
+                    e);
+        }
         return diff;
     }
 
     public static ModSnapshotDiff latestDiff() {
         return LATEST_DIFF.get();
+    }
+
+    public static ModpackLaunchHistoryState latestLaunchHistory() {
+        return LATEST_LAUNCH_HISTORY.get();
+    }
+
+    static ModpackLaunchHistoryState persistLaunchHistory(
+            Path target,
+            ModSnapshotDiff diff,
+            int maximumRecords
+    ) throws IOException {
+        ModpackLaunchHistoryStore.RecordResult result = new ModpackLaunchHistoryStore(
+                target, maximumRecords).record(ModpackLaunchRecord.from(diff));
+        return new ModpackLaunchHistoryState(
+                result.history(),
+                result.unavailableHistoryFiles(),
+                result.currentLaunchPersisted());
+    }
+
+    private static ModpackLaunchHistoryState currentLaunchInMemory(
+            Path target,
+            ModSnapshotDiff diff,
+            int maximumRecords
+    ) {
+        ModpackLaunchHistoryStore.LoadResult loaded = new ModpackLaunchHistoryStore(
+                target, maximumRecords).load();
+        ModpackLaunchHistory.AppendResult appended = loaded.history().append(
+                ModpackLaunchRecord.from(diff), maximumRecords);
+        int unavailableFiles = loaded.status() == ModpackLaunchHistoryStore.LoadStatus.CORRUPT
+                || loaded.status() == ModpackLaunchHistoryStore.LoadStatus.UNSUPPORTED_SCHEMA
+                ? 2 : 1;
+        return new ModpackLaunchHistoryState(appended.history(), unavailableFiles, false);
     }
 
     public static ModSnapshot capture() {

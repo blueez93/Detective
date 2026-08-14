@@ -6,6 +6,9 @@ import fr.apocalypsebleu.moddetective.client.ui.model.IncidentSummaryViewModel;
 import fr.apocalypsebleu.moddetective.core.casefile.CaseFile;
 import fr.apocalypsebleu.moddetective.snapshot.ModSnapshot;
 import fr.apocalypsebleu.moddetective.snapshot.ModSnapshotDiff;
+import fr.apocalypsebleu.moddetective.snapshot.ModpackLaunchHistory;
+import fr.apocalypsebleu.moddetective.snapshot.ModpackLaunchHistoryState;
+import fr.apocalypsebleu.moddetective.snapshot.ModpackLaunchRecord;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
@@ -291,8 +294,33 @@ class CaseEvolutionEngineTest {
                 result.changeHistoryAvailability());
         assertTrue(result.retainedHistoryCoverage().limitations().containsAll(Set.of(
                 CaseEvolution.CoverageLimitation.PARTIAL_CHANGE_HISTORY,
-                CaseEvolution.CoverageLimitation.UNAVAILABLE_SNAPSHOT_FILES,
-                CaseEvolution.CoverageLimitation.OMITTED_EARLIER_SNAPSHOTS)));
+                CaseEvolution.CoverageLimitation.UNAVAILABLE_CHANGE_HISTORY_SOURCES,
+                CaseEvolution.CoverageLimitation.OMITTED_EARLIER_LAUNCH_RECORDS,
+                CaseEvolution.CoverageLimitation.EARLIER_LAUNCH_HISTORY_UNAVAILABLE)));
+    }
+
+    @Test
+    void persistedLaunchHistoryFeedsMultipleChangesAndEvictionLimitsCoverage() {
+        ModpackLaunchHistory persisted = new ModpackLaunchHistory(
+                List.of(
+                        ModpackLaunchRecord.from(updated(FIRST - 6L * HOUR, "machines")),
+                        ModpackLaunchRecord.from(added(FIRST - 2L * HOUR, "extra")),
+                        ModpackLaunchRecord.from(unchanged(FIRST - HOUR, "machines"))),
+                4L,
+                true);
+
+        CaseEvolution result = analyze(
+                records(FIRST, FIRST + HOUR, FIRST + 2L * HOUR),
+                completeCoverage(),
+                ModpackChangeHistory.from(
+                        new ModpackLaunchHistoryState(persisted, 0, true)));
+
+        assertEquals(List.of("extra", "machines"), result.nearbyChanges().stream()
+                .map(CaseEvolution.NearbyModpackChange::modId).toList());
+        assertEquals(CaseEvolution.CoverageStatus.LIMITED_BEFORE,
+                result.retainedHistoryCoverage().status());
+        assertTrue(result.retainedHistoryCoverage().limitations().contains(
+                CaseEvolution.CoverageLimitation.OMITTED_EARLIER_LAUNCH_RECORDS));
     }
 
     @Test
@@ -368,7 +396,12 @@ class CaseEvolutionEngineTest {
         CaseEvolution result = analyze(
                 records(FIRST, FIRST + HOUR, FIRST + 2L * HOUR),
                 completeCoverage(),
-                ModpackChangeHistory.complete(List.of(olderChange, emptyLaterLaunch)));
+                ModpackChangeHistory.from(new ModpackLaunchHistoryState(
+                        new ModpackLaunchHistory(List.of(
+                                ModpackLaunchRecord.from(olderChange),
+                                ModpackLaunchRecord.from(emptyLaterLaunch)), 0L, true),
+                        0,
+                        true)));
 
         assertFalse(result.nearbyChanges().getFirst().sameRecordedLaunch());
         assertEquals(CaseEvolution.ProximityBand.VERY_NEAR,
@@ -510,6 +543,12 @@ class CaseEvolutionEngineTest {
         return ModSnapshotDiff.between(
                 snapshot(capturedAt - 1L, List.of(mod(id, displayName(id), "1.0"))),
                 snapshot(capturedAt, List.of()));
+    }
+
+    private static ModSnapshotDiff unchanged(long capturedAt, String id) {
+        return ModSnapshotDiff.between(
+                snapshot(capturedAt - 1L, List.of(mod(id, displayName(id), "1.0"))),
+                snapshot(capturedAt, List.of(mod(id, displayName(id), "1.0"))));
     }
 
     private static ModSnapshot snapshot(long capturedAt, List<ModSnapshot.LoadedMod> mods) {
