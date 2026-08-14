@@ -4,6 +4,8 @@ import fr.apocalypsebleu.moddetective.ModDetective;
 import fr.apocalypsebleu.moddetective.client.ui.model.IncidentDetailViewModel;
 import fr.apocalypsebleu.moddetective.client.ui.model.IncidentIndexViewModel;
 import fr.apocalypsebleu.moddetective.client.ui.model.IncidentSummaryViewModel;
+import fr.apocalypsebleu.moddetective.core.comparison.IncidentComparison;
+import fr.apocalypsebleu.moddetective.core.comparison.IncidentComparisonLoader;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -13,9 +15,11 @@ import java.util.List;
 
 public final class DetectiveUiRepository {
     private final Path incidentsRoot;
+    private final IncidentComparisonLoader comparisonLoader;
 
     public DetectiveUiRepository(Path incidentsRoot) {
         this.incidentsRoot = incidentsRoot.toAbsolutePath().normalize();
+        this.comparisonLoader = new IncidentComparisonLoader(this.incidentsRoot);
     }
 
     public IncidentIndexViewModel loadIndex(long sessionStartedEpochMs) {
@@ -48,6 +52,11 @@ public final class DetectiveUiRepository {
             throw new IOException("Incident path is outside the Detective data directory");
         }
         return IncidentJsonAdapter.readDetail(normalized);
+    }
+
+    /** Loads and compares only the two requested local incident records. */
+    public IncidentComparison loadComparison(Path firstSource, Path secondSource) throws IOException {
+        return comparisonLoader.compare(firstSource, secondSource);
     }
 
     private static boolean isIncidentFile(Path path) {

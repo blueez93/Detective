@@ -6,6 +6,7 @@ import fr.apocalypsebleu.moddetective.client.ui.model.CaseIndexViewModel;
 import fr.apocalypsebleu.moddetective.client.ui.model.IncidentDetailViewModel;
 import fr.apocalypsebleu.moddetective.client.ui.model.IncidentIndexViewModel;
 import fr.apocalypsebleu.moddetective.client.ui.model.ModpackChangesViewModel;
+import fr.apocalypsebleu.moddetective.core.comparison.IncidentComparison;
 import fr.apocalypsebleu.moddetective.snapshot.ModSnapshotService;
 import fr.apocalypsebleu.moddetective.storage.ModDetectivePaths;
 
@@ -76,6 +77,20 @@ public final class DetectiveUiService {
         return CompletableFuture.supplyAsync(() -> {
             try {
                 return REPOSITORY.loadDetail(source);
+            } catch (Exception e) {
+                throw new CompletionException(e);
+            }
+        }, WORKER);
+    }
+
+    /** Performs local disk loading and pairwise comparison on the existing UI-data worker. */
+    public static CompletableFuture<IncidentComparison> compareIncidents(
+            Path firstSource,
+            Path secondSource
+    ) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                return REPOSITORY.loadComparison(firstSource, secondSource);
             } catch (Exception e) {
                 throw new CompletionException(e);
             }

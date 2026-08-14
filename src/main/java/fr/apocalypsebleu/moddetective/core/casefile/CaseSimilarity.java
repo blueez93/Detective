@@ -79,7 +79,13 @@ public final class CaseSimilarity {
                 duration);
     }
 
-    private static double weightedJaccard(Map<String, Double> first, Map<String, Double> second) {
+    /**
+     * The evidence-overlap primitive shared with pairwise incident comparison.
+     * Existing Case scoring and clustering continue to call this exact implementation.
+     */
+    public static double weightedJaccard(Map<String, Double> first, Map<String, Double> second) {
+        Objects.requireNonNull(first, "first");
+        Objects.requireNonNull(second, "second");
         Set<String> keys = new TreeSet<>(first.keySet());
         keys.addAll(second.keySet());
         double intersection = 0.0;

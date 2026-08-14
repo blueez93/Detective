@@ -63,7 +63,8 @@ public final class IncidentHistoryLoader {
         return new LoadResult(List.copyOf(fingerprints), unreadable, ignoredByBound);
     }
 
-    IncidentFingerprint readFingerprint(Path source, String incidentId) throws IOException {
+    /** Reads one persisted fingerprint without requiring a history-wide scan. */
+    public IncidentFingerprint readFingerprint(Path source, String incidentId) throws IOException {
         JsonObject root = readCaseFields(source);
 
         long detectedAt = longValue(root, "detectedAtEpochMs", 0L);
