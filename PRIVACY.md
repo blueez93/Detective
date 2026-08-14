@@ -17,7 +17,9 @@ Minecraft, NeoForge, launchers, and other installed mods may have their own netw
 
 ## Local data
 
-Detective stores its settings, mod snapshots, Incident records, and generated Support Reports under the Minecraft instance's local `detective` data directory.
+Detective stores its settings, mod snapshots, Incident records, Case index, and generated Support Reports under the Minecraft instance's local `detective` data directory.
+
+For new Incidents, Case Files may persist bounded counts and truncated SHA-256 signatures derived from normalized class, frame, and stack-path symbols already observed by the watchdog, plus bounded mod-owner observations. These derived signatures do not add full raw thread dumps, source filenames, line numbers, thread names, object values, player data, or arbitrary runtime text.
 
 Incident history is bounded by the configured maximum count and age. Clearing Incident history removes only Detective's locally stored Incident records.
 
@@ -48,4 +50,4 @@ Report data is assembled from an explicit allow-list and receives additional red
 
 No automated filter can guarantee that every future or unexpectedly formatted value is harmless. Review a Support Report before posting it publicly, especially when it contains metadata supplied by third-party mods.
 
-If optional log attachment is added in a future version, it must be an explicit choice with a separate warning. Detective 0.7.0 does not automatically include Minecraft logs.
+If optional log attachment is added in a future version, it must be an explicit choice with a separate warning. Detective 0.8.0 does not automatically include Minecraft logs.

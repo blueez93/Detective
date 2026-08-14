@@ -32,6 +32,12 @@ Long-duration validation on Medium, Large, and Stress modpacks is still ongoing.
 - **Support Reports** — exports a lightweight local ZIP with human-readable summaries and schema-versioned JSON.
 - **Daily-use controls** — optional Incident notifications, bounded history retention, and essential settings.
 
+### Case Files
+
+Detective can group at least three technically similar Incidents into a recurring Case. Case Files summarize repeated technical and mod-owner evidence, occurrence history, stall durations, pattern consistency, and links to retained related Incidents. They are built from captured evidence rather than simply repeating a previous Primary Suspect.
+
+**Recurring similarity does not establish causation.** A Case does not prove that a mod is defective or solely responsible.
+
 Detective is client-side only. It has no telemetry, performs no automatic upload, and does not need to be installed on a server.
 
 ## Installation
@@ -45,7 +51,7 @@ Requirements:
 Steps:
 
 1. Install NeoForge for Minecraft 1.21.1.
-2. Place `detective-0.7.0.jar` in the client instance's `mods` folder.
+2. Place `detective-0.8.0.jar` in the client instance's `mods` folder.
 3. Start Minecraft and open Detective from the title screen or pause menu.
 
 No server installation is required. NeoForge **21.1.248** is the recommended tested runtime; a later compatible 21.1.x version may work, but versions not listed below have not been independently validated by the project.

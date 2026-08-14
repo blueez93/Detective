@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.8.0
+
+### Case Files
+
+- Added **Case Files**, a local history view for recurring technical patterns across recorded Incidents.
+- Added deterministic recurring-pattern detection based on Technical Similarity between captured stack, frame, class, leaf-owner, and stack-presence evidence. Primary Suspect attribution is not used as the main clustering criterion.
+- A recurring Case requires at least three sufficiently similar Incidents and uses conservative complete-link clustering to avoid joining incompatible patterns through a borderline Incident.
+- Added stable Case identity, so a matching Incident can join an existing Case without automatically renaming it.
+- Added local Case persistence and deterministic reconciliation across restarts, growth, retention, and unrelated history changes.
+- Case details show repeated technical and mod-owner evidence only when supported, together with occurrence count, first/last seen dates, stall-duration aggregates, pattern consistency, evidence strength, and navigation to retained related Incidents.
+- Added English and French Case Files list, detail, empty-state, home-summary, and safety wording.
+
+### Evidence persistence and compatibility
+
+- New schema-v2 Incidents persist compact, bounded, privacy-conscious derived evidence signatures for normalized classes, frames, and stack paths, plus bounded owner observations and counts.
+- Technical symbols are stored as truncated SHA-256 signatures; full raw thread dumps, source files, line numbers, thread names, object values, player data, and arbitrary runtime text are not added for Case Files.
+- Existing 0.7.0/schema-v1 Incident history remains readable and is not destructively rewritten. Missing or malformed optional derived evidence falls back safely to supported legacy hot-class and owner evidence.
+- Case analysis remains local-only, is bounded to the newest 500 eligible Incidents, and runs outside the Minecraft render thread.
+
+### Release hardening
+
+- Added compatibility coverage for legacy-only and mixed histories, absent/malformed derived evidence, missing/corrupt Case indexes, repeated restarts, retention, Case disappearance/reformation, and non-destructive Incident reads.
+- Added deterministic Case lifecycle and complete-link bridge regression coverage.
+- Final release-preparation baseline: 134 tests passed with 0 failures, 0 errors, and 0 skipped.
+
+Attribution and recurring patterns describe captured evidence. They do not prove that a mod is defective or solely responsible. Recurring similarity does not establish causation.
+
 ## 0.7.0
 
 First public release for Minecraft 1.21.1 and NeoForge.
