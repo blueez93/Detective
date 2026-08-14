@@ -3,9 +3,10 @@ package fr.apocalypsebleu.moddetective.client.ui.data;
 import fr.apocalypsebleu.moddetective.ModDetective;
 import fr.apocalypsebleu.moddetective.client.ui.model.IncidentDetailViewModel;
 import fr.apocalypsebleu.moddetective.client.ui.model.IncidentIndexViewModel;
-import fr.apocalypsebleu.moddetective.client.ui.model.IncidentSummaryViewModel;
 import fr.apocalypsebleu.moddetective.core.comparison.IncidentComparison;
 import fr.apocalypsebleu.moddetective.core.comparison.IncidentComparisonLoader;
+import fr.apocalypsebleu.moddetective.client.ui.data.query.IncidentSearchHistory;
+import fr.apocalypsebleu.moddetective.client.ui.data.query.IncidentSearchRecord;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -23,16 +24,25 @@ public final class DetectiveUiRepository {
     }
 
     public IncidentIndexViewModel loadIndex(long sessionStartedEpochMs) {
+        return loadSearchHistory(sessionStartedEpochMs).incidentIndex();
+    }
+
+    /** Loads the same bounded history used by the current index plus lightweight search metadata. */
+    public IncidentSearchHistory loadSearchHistory(long sessionStartedEpochMs) {
         if (!Files.isDirectory(incidentsRoot)) {
-            return IncidentIndexViewModel.empty(System.currentTimeMillis(), sessionStartedEpochMs);
+            return IncidentSearchHistory.create(
+                    List.of(), System.currentTimeMillis(), sessionStartedEpochMs, 0);
         }
 
-        List<IncidentSummaryViewModel> incidents = new ArrayList<>();
+        List<IncidentSearchRecord> incidents = new ArrayList<>();
         int unreadable = 0;
         try (var paths = Files.walk(incidentsRoot)) {
             for (Path path : paths.filter(DetectiveUiRepository::isIncidentFile).toList()) {
                 try {
-                    incidents.add(IncidentJsonAdapter.readSummary(path));
+                    Path normalized = path.toAbsolutePath().normalize();
+                    String incidentId = incidentsRoot.relativize(normalized)
+                            .toString().replace('\\', '/');
+                    incidents.add(IncidentJsonAdapter.readSearchRecord(normalized, incidentId));
                 } catch (IOException | RuntimeException e) {
                     unreadable++;
                     ModDetective.LOGGER.debug("[Detective] Skipping unreadable incident file in the UI: {}", path, e);
@@ -42,7 +52,7 @@ public final class DetectiveUiRepository {
             ModDetective.LOGGER.warn("[Detective] Unable to list incident files for the UI", e);
             unreadable++;
         }
-        return IncidentIndexViewModel.create(
+        return IncidentSearchHistory.create(
                 incidents, System.currentTimeMillis(), sessionStartedEpochMs, unreadable);
     }
 

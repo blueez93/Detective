@@ -11,6 +11,7 @@ import fr.apocalypsebleu.moddetective.client.ui.model.IncidentDetailViewModel;
 import fr.apocalypsebleu.moddetective.client.ui.model.IncidentSummaryViewModel;
 import fr.apocalypsebleu.moddetective.client.ui.model.SuspectViewModel;
 import fr.apocalypsebleu.moddetective.client.ui.model.UiFormatters;
+import fr.apocalypsebleu.moddetective.client.ui.data.query.IncidentSearchRecord;
 
 import java.io.IOException;
 import java.io.Reader;
@@ -19,15 +20,70 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.OptionalDouble;
+import java.util.OptionalLong;
+import java.util.Set;
+import java.util.TreeSet;
 
 /** Maps persisted incident bundles to stable UI data without exposing engine records to screens. */
 public final class IncidentJsonAdapter {
     private static final int MAX_GRAPH_POINTS = 240;
+    private static final Set<String> SUMMARY_FIELDS = Set.of(
+            "detectedAtEpochMs", "durationMs", "thresholdMs", "watchdogSamples",
+            "frame", "attributionEvidence", "suspects", "derivedEvidence");
 
     private IncidentJsonAdapter() {}
 
     public static IncidentSummaryViewModel readSummary(Path source) throws IOException {
         return parse(source, false).summary();
+    }
+
+    /** Reads only summary/search metadata; raw stacks and Black Box samples are not indexed. */
+    public static IncidentSearchRecord readSearchRecord(Path source, String incidentId)
+            throws IOException {
+        ParsedIncident parsed = parse(source, false);
+        JsonObject root = parsed.root();
+        JsonObject frame = object(root, "frame");
+        Set<String> ownerIds = new TreeSet<>();
+        Set<String> displayNames = new TreeSet<>();
+        JsonArray rawSuspects = array(root, "suspects");
+        if (rawSuspects != null) {
+            for (JsonElement element : rawSuspects) {
+                if (element.isJsonObject()) {
+                    JsonObject suspect = element.getAsJsonObject();
+                    strictText(suspect, "modId").ifPresent(ownerIds::add);
+                    strictText(suspect, "modName").ifPresent(displayNames::add);
+                }
+            }
+        }
+        JsonArray derivedOwners = array(object(root, "derivedEvidence"), "ownerObservations");
+        if (derivedOwners != null) {
+            for (JsonElement element : derivedOwners) {
+                if (element.isJsonObject()) {
+                    strictText(element.getAsJsonObject(), "ownerId").ifPresent(ownerIds::add);
+                }
+            }
+        }
+
+        OptionalLong detectedAt = strictLong(root, "detectedAtEpochMs");
+        if (detectedAt.isEmpty()) {
+            detectedAt = strictLong(frame, "epochMs");
+        }
+        OptionalDouble duration = strictDouble(root, "durationMs");
+        if (duration.isEmpty()) {
+            duration = strictDouble(frame, "frameMs");
+        }
+        duration = duration.isPresent() && duration.getAsDouble() >= 0.0
+                ? duration : OptionalDouble.empty();
+        return new IncidentSearchRecord(
+                incidentId,
+                parsed.summary(),
+                ownerIds,
+                displayNames,
+                strictText(frame, "dimension"),
+                detectedAt,
+                duration);
     }
 
     public static IncidentDetailViewModel readDetail(Path source) throws IOException {
@@ -93,7 +149,7 @@ public final class IncidentJsonAdapter {
             JsonObject root = new JsonObject();
             while (reader.hasNext()) {
                 String name = reader.nextName();
-                if (!includeBlackBox && "blackBox".equals(name)) {
+                if (!includeBlackBox && !SUMMARY_FIELDS.contains(name)) {
                     reader.skipValue();
                 } else {
                     root.add(name, JsonParser.parseReader(reader));
@@ -237,6 +293,45 @@ public final class IncidentJsonAdapter {
             return value == null || value.isJsonNull() ? fallback : value.getAsDouble();
         } catch (RuntimeException ignored) {
             return fallback;
+        }
+    }
+
+    private static Optional<String> strictText(JsonObject object, String name) {
+        try {
+            JsonElement value = object == null ? null : object.get(name);
+            if (value == null || value.isJsonNull()
+                    || !value.isJsonPrimitive() || !value.getAsJsonPrimitive().isString()) {
+                return Optional.empty();
+            }
+            String result = value.getAsString().strip();
+            return result.isEmpty() ? Optional.empty() : Optional.of(result);
+        } catch (RuntimeException ignored) {
+            return Optional.empty();
+        }
+    }
+
+    private static OptionalLong strictLong(JsonObject object, String name) {
+        try {
+            JsonElement value = object == null ? null : object.get(name);
+            return value == null || value.isJsonNull()
+                    || !value.isJsonPrimitive() || !value.getAsJsonPrimitive().isNumber()
+                    ? OptionalLong.empty() : OptionalLong.of(value.getAsLong());
+        } catch (RuntimeException ignored) {
+            return OptionalLong.empty();
+        }
+    }
+
+    private static OptionalDouble strictDouble(JsonObject object, String name) {
+        try {
+            JsonElement value = object == null ? null : object.get(name);
+            if (value == null || value.isJsonNull()
+                    || !value.isJsonPrimitive() || !value.getAsJsonPrimitive().isNumber()) {
+                return OptionalDouble.empty();
+            }
+            double result = value.getAsDouble();
+            return Double.isFinite(result) ? OptionalDouble.of(result) : OptionalDouble.empty();
+        } catch (RuntimeException ignored) {
+            return OptionalDouble.empty();
         }
     }
 

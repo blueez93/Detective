@@ -132,4 +132,46 @@ class IncidentJsonAdapterTest {
         assertThrows(IOException.class, () -> IncidentJsonAdapter.readDetail(empty));
         assertThrows(IOException.class, () -> IncidentJsonAdapter.readDetail(truncated));
     }
+
+    @Test
+    void buildsPrivacyBoundedSearchMetadataFromLegacyAndEnhancedEvidence() throws IOException {
+        Path legacy = temporaryDirectory.resolve("freeze-legacy.json");
+        Path enhanced = temporaryDirectory.resolve("freeze-enhanced.json");
+        Files.writeString(legacy, """
+                {
+                  "schemaVersion":1,
+                  "detectedAtEpochMs":100,
+                  "durationMs":250.0,
+                  "attributionEvidence":{"state":"ATTRIBUTED"},
+                  "suspects":[{"modId":"legacy_owner","modName":"Legacy Owner"}],
+                  "arbitraryRuntimeText":"must never become searchable",
+                  "blackBox":[{"dimension":"ignored"}]
+                }
+                """);
+        Files.writeString(enhanced, """
+                {
+                  "schemaVersion":2,
+                  "detectedAtEpochMs":200,
+                  "durationMs":500.0,
+                  "frame":{"dimension":"minecraft:the_nether"},
+                  "attributionEvidence":{"state":"INSUFFICIENT_EVIDENCE"},
+                  "suspects":[],
+                  "derivedEvidence":{"ownerObservations":[
+                    {"ownerId":"derived_owner","presenceSamples":4}
+                  ]},
+                  "blackBox":[]
+                }
+                """);
+
+        var legacyRecord = IncidentJsonAdapter.readSearchRecord(legacy, "freeze-legacy.json");
+        var enhancedRecord = IncidentJsonAdapter.readSearchRecord(enhanced, "freeze-enhanced.json");
+
+        assertEquals(java.util.Set.of("legacy_owner"), legacyRecord.ownerIds());
+        assertEquals(java.util.Set.of("Legacy Owner"), legacyRecord.modDisplayNames());
+        assertTrue(legacyRecord.dimensionId().isEmpty());
+        assertEquals(java.util.Set.of("derived_owner"), enhancedRecord.ownerIds());
+        assertEquals("minecraft:the_nether", enhancedRecord.dimensionId().orElseThrow());
+        assertEquals(200L, enhancedRecord.detectedAtEpochMs().orElseThrow());
+        assertEquals(500.0, enhancedRecord.stallDurationMs().orElseThrow());
+    }
 }

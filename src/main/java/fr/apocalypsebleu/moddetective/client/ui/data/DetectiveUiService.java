@@ -7,6 +7,11 @@ import fr.apocalypsebleu.moddetective.client.ui.model.IncidentDetailViewModel;
 import fr.apocalypsebleu.moddetective.client.ui.model.IncidentIndexViewModel;
 import fr.apocalypsebleu.moddetective.client.ui.model.ModpackChangesViewModel;
 import fr.apocalypsebleu.moddetective.core.comparison.IncidentComparison;
+import fr.apocalypsebleu.moddetective.client.ui.data.query.CaseMembershipIndex;
+import fr.apocalypsebleu.moddetective.client.ui.data.query.IncidentQuery;
+import fr.apocalypsebleu.moddetective.client.ui.data.query.IncidentQueryEngine;
+import fr.apocalypsebleu.moddetective.client.ui.data.query.IncidentQueryResult;
+import fr.apocalypsebleu.moddetective.client.ui.data.query.IncidentSearchHistory;
 import fr.apocalypsebleu.moddetective.snapshot.ModSnapshotService;
 import fr.apocalypsebleu.moddetective.storage.ModDetectivePaths;
 
@@ -20,6 +25,7 @@ import java.util.concurrent.Executors;
 public final class DetectiveUiService {
     private static final Object LOCK = new Object();
     private static final DetectiveUiRepository REPOSITORY = new DetectiveUiRepository(ModDetectivePaths.incidents());
+    private static final IncidentQueryEngine QUERY_ENGINE = new IncidentQueryEngine();
     private static final ExecutorService WORKER = Executors.newSingleThreadExecutor(task -> {
         Thread thread = new Thread(task, "Detective-UiData");
         thread.setDaemon(true);
@@ -27,14 +33,16 @@ public final class DetectiveUiService {
         return thread;
     });
     private static CompletableFuture<IncidentIndexViewModel> cachedIndex;
+    private static CompletableFuture<IncidentSearchHistory> cachedSearchHistory;
     private static CompletableFuture<CaseIndexViewModel> cachedCases;
 
     private DetectiveUiService() {}
 
     public static CompletableFuture<IncidentIndexViewModel> refreshIndex() {
         synchronized (LOCK) {
-            cachedIndex = CompletableFuture.supplyAsync(
-                    () -> REPOSITORY.loadIndex(ModDetective.SESSION_STARTED_AT_EPOCH_MS), WORKER);
+            cachedSearchHistory = CompletableFuture.supplyAsync(
+                    () -> REPOSITORY.loadSearchHistory(ModDetective.SESSION_STARTED_AT_EPOCH_MS), WORKER);
+            cachedIndex = cachedSearchHistory.thenApply(IncidentSearchHistory::incidentIndex);
             return cachedIndex;
         }
     }
@@ -48,7 +56,31 @@ public final class DetectiveUiService {
     public static void invalidateIndex() {
         synchronized (LOCK) {
             cachedIndex = null;
+            cachedSearchHistory = null;
         }
+    }
+
+    /** Searches already loaded summaries on the UI-data worker; Case analysis remains separate. */
+    public static CompletableFuture<IncidentQueryResult> queryIncidents(IncidentQuery query) {
+        IncidentQuery requested = java.util.Objects.requireNonNull(query, "query");
+        CompletableFuture<IncidentSearchHistory> history;
+        synchronized (LOCK) {
+            if (cachedSearchHistory == null) {
+                refreshIndex();
+            }
+            history = cachedSearchHistory;
+        }
+        if (!requested.requiresCaseMembership()) {
+            return history.thenApplyAsync(value -> QUERY_ENGINE.query(
+                    value.records(), requested, CaseMembershipIndex.unavailable()), WORKER);
+        }
+        CompletableFuture<CaseMembershipIndex> memberships =
+                DetectiveSupportService.preparedCaseHistory()
+                        .handle((result, error) -> error == null && result != null
+                                ? CaseMembershipIndex.available(result)
+                                : CaseMembershipIndex.unavailable());
+        return history.thenCombineAsync(memberships, (value, cases) -> QUERY_ENGINE.query(
+                value.records(), requested, cases), WORKER);
     }
 
     public static CompletableFuture<CaseIndexViewModel> refreshCases() {

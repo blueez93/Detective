@@ -46,6 +46,22 @@ class DetectiveUiRepositoryTest {
         }
     }
 
+    @Test
+    void searchHistoryKeepsTheExistingNewestFiveHundredBound() throws IOException {
+        Path incidents = Files.createDirectories(temporaryDirectory.resolve("bounded-incidents"));
+        for (int index = 1; index <= 510; index++) {
+            writeIncident(incidents.resolve("freeze-%03d.json".formatted(index)), index);
+        }
+
+        var history = new DetectiveUiRepository(incidents).loadSearchHistory(0L);
+
+        assertEquals(500, history.records().size());
+        assertEquals(510L, history.records().getFirst().summary().detectedAtEpochMs());
+        assertEquals(11L, history.records().getLast().summary().detectedAtEpochMs());
+        assertEquals(history.incidentIndex().incidents(),
+                history.records().stream().map(value -> value.summary()).toList());
+    }
+
     private static void writeIncident(Path file, long timestamp) throws IOException {
         Files.writeString(file, """
                 {"schemaVersion":1,"detectedAtEpochMs":%d,"durationMs":150.0,
