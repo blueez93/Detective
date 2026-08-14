@@ -11,9 +11,11 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DerivedIncidentEvidenceTest {
@@ -76,6 +78,35 @@ class DerivedIncidentEvidenceTest {
         assertEquals(first.classSignatures(), second.classSignatures());
         assertEquals(first.frameSignatures(), second.frameSignatures());
         assertEquals(first.stackPathSignatures(), second.stackPathSignatures());
+    }
+
+    @Test
+    void fullSchemaV1IncidentLoadsAsCurrentWithoutRewritingTheLegacyFile() throws IOException {
+        FrameSample frame = new FrameSample(
+                1_000L, 2_000L, 400.0, 2.5, 3L, 4L,
+                "minecraft:overworld", 0, 64, 0);
+        FreezeIncident currentShapeWithoutDerived = new FreezeIncident(
+                1_000L, 400.0, 120.0, frame, 6,
+                new AttributionEvidence(AttributionEvidence.State.ATTRIBUTED, 6, 6, 0, 0),
+                List.of(new SuspectAnalyzer.Suspect(
+                        "legacy-owner", "Legacy Owner", "1", 6, 100.0,
+                        6, 100.0, 0.0, 0, 6, 0, 1)),
+                List.of(new SuspectAnalyzer.HotClass("example.legacy.Work", 6)),
+                List.of(frame));
+        String legacyJson = new com.google.gson.GsonBuilder().setPrettyPrinting().create()
+                .toJson(currentShapeWithoutDerived)
+                .replace("\"schemaVersion\": 2", "\"schemaVersion\": 1")
+                .replace(",\n  \"derivedEvidence\": null", "");
+        Path source = temporaryDirectory.resolve("freeze-schema-v1.json");
+        Files.writeString(source, legacyJson);
+        byte[] original = Files.readAllBytes(source);
+
+        FreezeIncident loaded = IncidentStore.read(source);
+
+        assertEquals(FreezeIncident.SCHEMA_VERSION, loaded.schemaVersion());
+        assertNull(loaded.derivedEvidence());
+        assertEquals("legacy-owner", loaded.suspects().getFirst().modId());
+        assertArrayEquals(original, Files.readAllBytes(source));
     }
 
     private static StackSnapshot stack(long nanoTime, String className, String methodName) {
